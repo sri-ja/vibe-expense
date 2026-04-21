@@ -1,59 +1,69 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+    LineChart, 
+    Line, 
+    XAxis, 
+    YAxis, 
+    CartesianGrid, 
+    Tooltip, 
+    ResponsiveContainer, 
+    Legend,
+    AreaChart,
+    Area
+} from 'recharts';
+import { 
+    Activity, 
+    Lightbulb, 
+    X, 
+    ChevronLeft, 
+    ChevronRight, 
+    Calendar,
+    Filter,
+    TrendingUp,
+    BarChart3,
+    Check
+} from 'lucide-react';
 import { Expense } from '../types';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { aggregateMultiCategoryExpenses, formatTrendDate } from '../utils/trendsUtils';
 import { getCategoryColor } from '../utils/colorUtils';
-import { getSpendingInsights } from '../services/geminiService';
-import { SpinnerIcon } from './icons/SpinnerIcon';
 import { getStartOfWeek, toLocalDateString, formatDateRange } from '../utils/dateUtils';
-import { ChartBarIcon } from './icons/ChartBarIcon';
-import { SparklesIcon } from './icons/SparklesIcon';
-import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
-import { ChevronRightIcon } from './icons/ChevronRightIcon';
+import Insights from './Insights';
 
+interface TrendsProps {
+  onClose: () => void;
+  initialTab: 'trends' | 'insights';
+  expenses: Expense[];
+  categories: string[];
+}
 
-// =================================================================================
-// Tab Button Helper Component
-// =================================================================================
-const TabButton: React.FC<{ icon: React.ReactNode; label: string; isActive: boolean; onClick: () => void; }> = ({ icon, label, isActive, onClick }) => (
-    <button
-        onClick={onClick}
-        className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
-            isActive 
-            ? 'text-indigo-600 border-indigo-600' 
-            : 'text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-100'
-        }`}
-        role="tab"
-        aria-selected={isActive}
-    >
-        {icon}
-        {label}
-    </button>
-);
-
-
-// =================================================================================
-// Trends Content (Internal Component)
-// =================================================================================
 const TrendsTooltip = ({ active, payload, label, period }: any) => {
   if (active && payload && payload.length) {
     const formattedDate = formatTrendDate(label, period);
     return (
-      <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg">
-        <p className="font-semibold text-slate-800 mb-2">{formattedDate}</p>
-        {payload.map((pld: any) => (
-             <p key={pld.dataKey} style={{ color: pld.stroke }} className="text-sm">
-                {`${pld.name}: ₹${pld.value.toFixed(2)}`}
-            </p>
-        ))}
+      <div className="bg-white p-3 border border-slate-200 rounded-xl shadow-lg">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 border-b border-slate-50 pb-1.5">{formattedDate}</p>
+        <div className="space-y-1.5">
+            {payload.map((pld: any) => (
+                <div key={pld.dataKey} className="flex items-center justify-between gap-4">
+                    <span className="text-[11px] font-medium text-slate-600 flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: pld.stroke || pld.fill }} />
+                        {pld.name}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-900 tabular-nums">
+                        ₹{pld.value.toLocaleString('en-IN')}
+                    </span>
+                </div>
+            ))}
+        </div>
       </div>
     );
   }
   return null;
 };
 
-const TrendsContent: React.FC<{ expenses: Expense[]; categories: string[]; }> = ({ expenses, categories }) => {
+const SpendingTrends: React.FC<{ expenses: Expense[]; categories: string[]; }> = ({ expenses, categories }) => {
     const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
     const [selectedCategories, setSelectedCategories] = useState<string[]>(['overall']);
     const [isCategorySelectorOpen, setIsCategorySelectorOpen] = useState(false);
@@ -61,28 +71,23 @@ const TrendsContent: React.FC<{ expenses: Expense[]; categories: string[]; }> = 
     const [currentDate, setCurrentDate] = useState(new Date());
 
     useEffect(() => {
-        // Reset to today when changing view mode for a better UX
         setCurrentDate(new Date());
     }, [period]);
     
     const { dateRange, displayDate } = useMemo(() => {
         let start: Date, end: Date, display: string;
-    
-        if (period === 'day') { // Paginated by week
+        if (period === 'day') {
             start = getStartOfWeek(currentDate);
             end = new Date(start);
             end.setDate(start.getDate() + 6);
-            end.setHours(23, 59, 59, 999);
             display = formatDateRange(start, end);
-        } else if (period === 'week') { // Paginated by month
+        } else if (period === 'week') {
             start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
             end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-            end.setHours(23, 59, 59, 999);
             display = currentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
-        } else { // 'month' view, paginated by year
+        } else {
             start = new Date(currentDate.getFullYear(), 0, 1);
             end = new Date(currentDate.getFullYear(), 11, 31);
-            end.setHours(23, 59, 59, 999);
             display = currentDate.getFullYear().toString();
         }
         return { dateRange: { start, end }, displayDate: display };
@@ -107,22 +112,16 @@ const TrendsContent: React.FC<{ expenses: Expense[]; categories: string[]; }> = 
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
     const navigatePeriod = (direction: 'prev' | 'next') => {
         const increment = direction === 'next' ? 1 : -1;
         setCurrentDate(prevDate => {
             const newDate = new Date(prevDate);
-            if (period === 'day') { // by week
-                newDate.setDate(newDate.getDate() + (7 * increment));
-            } else if (period === 'week') { // by month
-                newDate.setMonth(newDate.getMonth() + increment, 1); // Use day 1 to avoid month-end issues
-            } else { // 'month' view, by year
-                newDate.setFullYear(newDate.getFullYear() + increment);
-            }
+            if (period === 'day') newDate.setDate(newDate.getDate() + (7 * increment));
+            else if (period === 'week') newDate.setMonth(newDate.getMonth() + increment, 1);
+            else newDate.setFullYear(newDate.getFullYear() + increment);
             return newDate;
         });
     };
@@ -136,92 +135,243 @@ const TrendsContent: React.FC<{ expenses: Expense[]; categories: string[]; }> = 
                 const newSelection = isSelected 
                     ? prev.filter(c => c !== category)
                     : [...prev.filter(c => c !== 'overall'), category];
-                
-                if (newSelection.length === 0) {
-                    return ['overall'];
-                }
-                return newSelection;
+                return newSelection.length === 0 ? ['overall'] : newSelection;
             });
         }
     };
 
-    const getButtonLabel = () => {
-        if (selectedCategories.includes('overall')) return 'Overall Spending';
-        if (selectedCategories.length === 1) return selectedCategories[0];
-        return `${selectedCategories.length} categories selected`;
-    }
-
     return (
-        <div className="h-full flex flex-col">
-            <div className="flex items-center justify-center mb-4">
-                <button onClick={() => navigatePeriod('prev')} className="p-2 rounded-full hover:bg-slate-200 text-slate-600" title="Previous Period">
-                    <ChevronLeftIcon />
-                </button>
-                <span className="font-semibold text-slate-700 mx-4 w-48 text-center">{displayDate}</span>
-                <button onClick={() => navigatePeriod('next')} className="p-2 rounded-full hover:bg-slate-200 text-slate-600" title="Next Period">
-                    <ChevronRightIcon />
-                </button>
+        <div className="h-full flex flex-col pt-2">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+                <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl">
+                    {[
+                        { id: 'day', label: 'Day' },
+                        { id: 'week', label: 'Week' },
+                        { id: 'month', label: 'Month' }
+                    ].map(p => (
+                        <button 
+                            key={p.id}
+                            onClick={() => setPeriod(p.id as any)} 
+                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold tracking-tight transition-all ${period === p.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex items-center gap-4 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
+                    <button onClick={() => navigatePeriod('prev')} className="p-1 hover:bg-slate-200 rounded-md transition-colors">
+                        <ChevronLeft className="h-4 w-4 text-slate-400" />
+                    </button>
+                    <span className="text-sm font-semibold text-slate-700 min-w-[120px] text-center">{displayDate}</span>
+                    <button onClick={() => navigatePeriod('next')} className="p-1 hover:bg-slate-200 rounded-md transition-colors">
+                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                    </button>
+                </div>
+
+                <div className="relative w-full md:w-64" ref={categorySelectorRef}>
+                    <button 
+                        onClick={() => setIsCategorySelectorOpen(!isCategorySelectorOpen)} 
+                        className="w-full flex items-center justify-between px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-slate-400 transition-all"
+                    >
+                        <div className="flex items-center gap-2">
+                            <Filter className="h-3.5 w-3.5 text-slate-400" />
+                            <span className="text-xs font-medium text-slate-600">
+                                {selectedCategories.includes('overall') ? 'All Spending' : `${selectedCategories.length} Selected`}
+                            </span>
+                        </div>
+                        <ChevronRight className={`h-3.5 w-3.5 text-slate-300 transition-transform ${isCategorySelectorOpen ? 'rotate-90' : ''}`} />
+                    </button>
+
+                    <AnimatePresence>
+                        {isCategorySelectorOpen && (
+                             <motion.div 
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 5 }}
+                                className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-[110] p-1.5"
+                             >
+                                <button 
+                                    onClick={() => handleCategoryToggle('overall')} 
+                                    className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs transition-all ${selectedCategories.includes('overall') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                                >
+                                    <span className="font-medium">Overall Spending</span>
+                                    {selectedCategories.includes('overall') && <Check className="h-3 w-3" />}
+                                </button>
+                                <div className="h-px bg-slate-100 my-1.5" />
+                                <div className="max-h-60 overflow-y-auto">
+                                    {categories.sort().map(cat => (
+                                        <button 
+                                            key={cat} 
+                                            onClick={() => handleCategoryToggle(cat)} 
+                                            className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs transition-all ${selectedCategories.includes(cat) ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-500 hover:bg-slate-50'}`}
+                                        >
+                                            <span>{cat}</span>
+                                            {selectedCategories.includes(cat) && <Check className="h-3 w-3" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
-                <div className="p-1 bg-slate-200 rounded-full flex text-sm">
-                    <button onClick={() => setPeriod('day')} className={`px-3 py-1 rounded-full font-semibold transition-colors ${period === 'day' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}>Daily</button>
-                    <button onClick={() => setPeriod('week')} className={`px-3 py-1 rounded-full font-semibold transition-colors ${period === 'week' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}>Weekly</button>
-                    <button onClick={() => setPeriod('month')} className={`px-3 py-1 rounded-full font-semibold transition-colors ${period === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}>Monthly</button>
-                </div>
-                <div className="relative w-full sm:w-64" ref={categorySelectorRef}>
-                    <button onClick={() => setIsCategorySelectorOpen(!isCategorySelectorOpen)} className="w-full flex items-center justify-between p-2 bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500">
-                        <span className="text-slate-700">{getButtonLabel()}</span>
-                        <svg className={`h-5 w-5 text-slate-400 transition-transform ${isCategorySelectorOpen ? 'transform rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                    </button>
-                    {isCategorySelectorOpen && (
-                         <div className="absolute top-full mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
-                            <div onClick={() => handleCategoryToggle('overall')} className="flex items-center gap-3 w-full text-left px-4 py-2 text-slate-700 hover:bg-slate-100 cursor-pointer">
-                                <input type="checkbox" checked={selectedCategories.includes('overall')} readOnly className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500"/>
-                                <span>Overall Spending</span>
-                            </div>
-                            {categories.sort().map(cat => (
-                                <div key={cat} onClick={() => handleCategoryToggle(cat)} className="flex items-center gap-3 w-full text-left px-4 py-2 text-slate-700 hover:bg-slate-100 cursor-pointer">
-                                    <input type="checkbox" checked={selectedCategories.includes(cat)} readOnly className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                                    <span>{cat}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-            <div className="flex-grow">
+            <div className="flex-grow min-h-[400px]">
                {trendData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                            <XAxis dataKey="date" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(tick) => formatTrendDate(tick, period)} />
-                            <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${value}`} width={80} />
+                         <AreaChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <defs>
+                                {selectedCategories.map(cat => {
+                                    const color = getCategoryColor(cat);
+                                    return (
+                                        <linearGradient key={`grad-${cat}`} id={`fill-${cat}`} x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor={color.hex} stopOpacity={0.1}/>
+                                            <stop offset="95%" stopColor={color.hex} stopOpacity={0}/>
+                                        </linearGradient>
+                                    );
+                                })}
+                            </defs>
+                            <CartesianGrid strokeDasharray="4 4" stroke="#f1f5f9" vertical={false} />
+                            <XAxis 
+                                dataKey="date" 
+                                stroke="#94a3b8" 
+                                fontSize={10} 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tickFormatter={(tick) => formatTrendDate(tick, period)} 
+                                dy={10}
+                            />
+                            <YAxis 
+                                stroke="#94a3b8" 
+                                fontSize={10} 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tickFormatter={(value) => `₹${value >= 1000 ? `${(value/1000).toFixed(1)}k` : value}`} 
+                                width={50} 
+                            />
                             <Tooltip content={<TrendsTooltip period={period} />} />
-                            <Legend />
                             {selectedCategories.map(category => {
                                 const color = getCategoryColor(category);
-                                return <Line key={category} name={category === 'overall' ? 'Overall' : category} type="monotone" dataKey={category} stroke={color.hex} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 8 }} />;
+                                return (
+                                    <Area 
+                                        key={category} 
+                                        name={category === 'overall' ? 'Overall' : category} 
+                                        type="monotone" 
+                                        dataKey={category} 
+                                        stroke={color.hex} 
+                                        strokeWidth={2} 
+                                        fill={`url(#fill-${category})`}
+                                        activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
+                                    />
+                                );
                             })}
-                        </LineChart>
+                        </AreaChart>
                     </ResponsiveContainer>
                ) : (
-                    <div className="h-full flex items-center justify-center text-center">
-                        <div>
-                            <p className="text-slate-500">No data to display for this period.</p>
-                            <p className="text-sm text-slate-400">Categorize expenses or select a different period.</p>
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center text-center">
+                        <div className="h-16 w-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4 text-slate-300">
+                             <BarChart3 className="h-6 w-6" />
                         </div>
-                    </div>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">No data to display</p>
+                    </motion.div>
                )}
             </div>
         </div>
     );
 };
 
+const Trends: React.FC<TrendsProps> = ({ onClose, initialTab, expenses, categories }) => {
+    const [activeTab, setActiveTab] = useState(initialTab);
+    
+    return (
+        <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 md:p-8"
+            onClick={onClose}
+        >
+            <motion.div 
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-slate-50 md:rounded-3xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden relative border border-white/20"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="p-6 bg-white border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-3">
+                         <div className="h-10 w-10 bg-slate-900 rounded-xl flex items-center justify-center text-white">
+                            <TrendingUp className="h-5 w-5" />
+                         </div>
+                         <div>
+                            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Financial Analysis</h2>
+                            <p className="text-xs text-slate-500 font-medium tracking-tight">Spending trends & automated insights</p>
+                         </div>
+                    </div>
+                    
+                    <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
+                        <button 
+                            onClick={() => setActiveTab('trends')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === 'trends' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <Activity className="h-3.5 w-3.5" />
+                            Trends
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('insights')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === 'insights' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <Lightbulb className="h-3.5 w-3.5" />
+                            Insights
+                        </button>
+                    </div>
 
-// =================================================================================
-// Insights Content (Internal Component)
-// =================================================================================
+                    <button 
+                        onClick={onClose} 
+                        className="absolute top-6 right-6 p-2 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <div className="flex-grow p-6 md:p-8 overflow-y-auto custom-scrollbar">
+                    <AnimatePresence mode="wait">
+                        {activeTab === 'trends' ? (
+                            <motion.div 
+                                key="trends-tab"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="h-full"
+                            >
+                                <SpendingTrends expenses={expenses} categories={categories} />
+                            </motion.div>
+                        ) : (
+                            <motion.div 
+                                key="insights-tab"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="h-full"
+                            >
+                                <InsightsContent allExpenses={expenses} />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+};
+
+// Re-implementing InsightsContent within Trends for backward compatibility with App.tsx state management if needed, 
+// using the refined logic from our separate Insights file.
+import ReactMarkdown from 'react-markdown';
+import { Sparkles, Info, AlertCircle } from 'lucide-react';
+import { getSpendingInsights } from '../services/geminiService';
+import { SpinnerIcon } from './icons/SpinnerIcon';
+
 const InsightsContent: React.FC<{ allExpenses: Expense[]; }> = ({ allExpenses }) => {
     const today = new Date();
     const firstDayOfMonth = toLocalDateString(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -243,182 +393,60 @@ const InsightsContent: React.FC<{ allExpenses: Expense[]; }> = ({ allExpenses })
         });
     }, [allExpenses, startDate, endDate]);
 
-    const handleSetDateRange = (preset: 'this-week' | 'last-week' | 'this-month' | 'last-month') => {
-        const today = new Date();
-        let start: Date;
-        let end: Date;
-        switch (preset) {
-            case 'this-week':
-                start = getStartOfWeek(today);
-                end = new Date(start);
-                end.setDate(start.getDate() + 6);
-                break;
-            case 'last-week':
-                const lastWeekDate = new Date();
-                lastWeekDate.setDate(today.getDate() - 7);
-                start = getStartOfWeek(lastWeekDate);
-                end = new Date(start);
-                end.setDate(start.getDate() + 6);
-                break;
-            case 'this-month':
-                start = new Date(today.getFullYear(), today.getMonth(), 1);
-                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                break;
-            case 'last-month':
-                start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-                end = new Date(today.getFullYear(), today.getMonth(), 0);
-                break;
-        }
-        setStartDate(toLocalDateString(start));
-        setEndDate(toLocalDateString(end));
-    };
-
     const handleGenerateInsights = async () => {
-        if (new Date(startDate) > new Date(endDate)) {
-            setError('Start date cannot be after the end date.');
-            return;
-        }
-        if (filteredExpenses.length === 0) {
-            setError('There are no expenses in the selected date range to analyze.');
-            setInsightsResult(null);
-            return;
-        }
         setIsLoading(true);
         setError(null);
-        setInsightsResult(null);
         try {
             const result = await getSpendingInsights(filteredExpenses);
             setInsightsResult(result);
         } catch (err: any) {
-            setError(err.message || 'An unknown error occurred.');
+            setError(err.message || 'Analysis failed.');
         } finally {
             setIsLoading(false);
         }
     };
-    
-    const parseInlineMarkdown = (text: string): React.ReactNode[] => {
-        const parts = text.split(/(\*\*.*?\*\*)/g);
-        return parts.filter(part => part).map((part, index) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-                return <strong key={index}>{part.slice(2, -2)}</strong>;
-            }
-            return part;
-        });
-    };
-    
-    const renderFormattedText = (text: string) => {
-        const lines = text.split('\n');
-        // Fix: Use React.ReactNode instead of JSX.Element to resolve namespace error
-        const elements: React.ReactNode[] = [];
-        let listItems: React.ReactNode[] = [];
-
-        const closeList = () => {
-            if (listItems.length > 0) {
-                elements.push(<ul key={`ul-${elements.length}`} className="list-disc pl-5 space-y-1 my-2">{listItems}</ul>);
-                listItems = [];
-            }
-        };
-
-        lines.forEach((line, index) => {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith('* ')) {
-                listItems.push(<li key={`li-${index}`} className="text-slate-600">{parseInlineMarkdown(trimmedLine.substring(2))}</li>);
-            } else {
-                closeList();
-                if (trimmedLine.startsWith('### ')) {
-                    elements.push(<h3 key={`h3-${index}`} className="text-lg font-semibold text-slate-800 mt-4 mb-2">{parseInlineMarkdown(trimmedLine.substring(4))}</h3>);
-                } else if (trimmedLine) {
-                    elements.push(<p key={`p-${index}`} className="text-slate-600 mb-2">{parseInlineMarkdown(line)}</p>);
-                }
-            }
-        });
-        closeList();
-        return elements;
-    };
 
     return (
-        <div>
-            <div className="bg-white p-4 rounded-lg border border-slate-200">
-                <p className="text-sm font-medium text-slate-700 mb-3">Select date range for analysis:</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                    <button onClick={() => handleSetDateRange('this-week')} className="w-full text-sm py-1.5 px-2 rounded-md font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">This Week</button>
-                    <button onClick={() => handleSetDateRange('last-week')} className="w-full text-sm py-1.5 px-2 rounded-md font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">Last Week</button>
-                    <button onClick={() => handleSetDateRange('this-month')} className="w-full text-sm py-1.5 px-2 rounded-md font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">This Month</button>
-                    <button onClick={() => handleSetDateRange('last-month')} className="w-full text-sm py-1.5 px-2 rounded-md font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">Last Month</button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="start-date" className="block text-xs text-slate-500">Start Date</label>
-                        <input type="date" id="start-date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1 w-full p-2 bg-white border border-slate-300 rounded-md" />
-                    </div>
-                     <div>
-                        <label htmlFor="end-date" className="block text-xs text-slate-500">End Date</label>
-                        <input type="date" id="end-date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="mt-1 w-full p-2 bg-white border border-slate-300 rounded-md" />
-                    </div>
-                </div>
-            </div>
-            <div className="mt-6">
-                <button onClick={handleGenerateInsights} disabled={isLoading} className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 disabled:cursor-not-allowed">
-                    {isLoading ? (<><SpinnerIcon className="h-5 w-5 text-white" />Generating Insights...</>) : (`Analyze ${filteredExpenses.length} Expenses`)}
-                </button>
-            </div>
-            <div className="mt-6">
-                {error && <div className="bg-red-100 text-red-800 p-3 rounded-md text-sm">{error}</div>}
-                {insightsResult && !isLoading && <div className="bg-white p-5 rounded-lg border border-slate-200">{renderFormattedText(insightsResult)}</div>}
-                {!insightsResult && !isLoading && !error && <div className="text-center py-10"><p className="text-slate-500">Your spending analysis will appear here.</p></div>}
-            </div>
-        </div>
-    );
-};
-
-
-// =================================================================================
-// Main Analysis Modal Component
-// =================================================================================
-interface TrendsProps {
-  onClose: () => void;
-  initialTab: 'trends' | 'insights';
-  expenses: Expense[];
-  categories: string[];
-}
-
-const Trends: React.FC<TrendsProps> = ({ onClose, initialTab, expenses, categories }) => {
-    const [activeTab, setActiveTab] = useState(initialTab);
-    
-    return (
-        <div 
-            className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4"
-            onClick={onClose}
-        >
-            <div 
-                className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-white rounded-t-2xl">
-                    <h2 className="text-xl font-bold text-slate-800">Analysis</h2>
-                    <button onClick={onClose} className="text-slate-500 hover:text-slate-800 text-3xl leading-none">&times;</button>
+        <div className="space-y-8 max-w-4xl mx-auto">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-6">
+                    <Calendar className="h-4 w-4 text-slate-400" />
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Analysis Range</h3>
                 </div>
                 
-                <div className="flex gap-2 px-4 border-b border-slate-200 bg-white" role="tablist">
-                    <TabButton 
-                        icon={<ChartBarIcon className="h-5 w-5"/>} 
-                        label="Trends" 
-                        isActive={activeTab === 'trends'} 
-                        onClick={() => setActiveTab('trends')} 
-                    />
-                    <TabButton 
-                        icon={<SparklesIcon className="h-5 w-5"/>} 
-                        label="Insights" 
-                        isActive={activeTab === 'insights'} 
-                        onClick={() => setActiveTab('insights')} 
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div className="space-y-1.5">
+                        <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider px-1">Start Date</label>
+                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium outline-none focus:border-slate-400 transition-all" />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider px-1">End Date</label>
+                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium outline-none focus:border-slate-400 transition-all" />
+                    </div>
                 </div>
 
-                <div className="flex-grow p-6 overflow-y-auto">
-                    {activeTab === 'trends' && <TrendsContent expenses={expenses} categories={categories} />}
-                    {activeTab === 'insights' && <InsightsContent allExpenses={expenses} />}
-                </div>
+                <button 
+                    onClick={handleGenerateInsights}
+                    disabled={isLoading || filteredExpenses.length === 0}
+                    className="w-full btn-primary h-auto py-3 text-sm flex items-center justify-center gap-2"
+                >
+                    {isLoading ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : `Analyze ${filteredExpenses.length} Records`}
+                </button>
             </div>
+
+            <AnimatePresence mode="wait">
+                {insightsResult && !isLoading && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm relative">
+                        <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+                            <Info className="h-4 w-4 text-slate-400" />
+                            <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">Analysis Result</h3>
+                        </div>
+                        <div className="prose prose-slate prose-sm max-w-none">
+                             <ReactMarkdown>{insightsResult}</ReactMarkdown>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

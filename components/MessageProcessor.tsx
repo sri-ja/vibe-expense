@@ -1,10 +1,18 @@
 
 import React, { useState } from 'react';
-import { SpinnerIcon } from './icons/SpinnerIcon';
-import { TrashIcon } from './icons/TrashIcon';
-import { CameraIcon } from './icons/CameraIcon';
-import { UploadIcon } from './icons/UploadIcon';
-import { XIcon } from './icons/XIcon';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+    X, 
+    Plus, 
+    Trash2, 
+    Camera, 
+    Image as ImageIcon, 
+    Zap, 
+    BrainCircuit,
+    History,
+    AlertCircle,
+    Loader2
+} from 'lucide-react';
 
 interface MessageProcessorProps {
     onProcess: () => Promise<void>;
@@ -24,7 +32,7 @@ const MessageProcessor: React.FC<MessageProcessorProps> = ({ onProcess, isProces
         e.preventDefault();
         const trimmedText = currentText.trim();
         if (trimmedText) {
-            setTransactionTexts(prev => [...prev, trimmedText]);
+            setTransactionTexts(prev => [trimmedText, ...prev]);
             setCurrentText('');
         }
     };
@@ -40,105 +48,138 @@ const MessageProcessor: React.FC<MessageProcessorProps> = ({ onProcess, isProces
     };
 
     return (
-        <div className="w-full max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200/80 relative">
+        <div className="card-premium p-6 md:p-8 max-w-2xl mx-auto relative overflow-hidden">
              <button 
                 onClick={onClose} 
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all z-10"
                 aria-label="Close"
             >
-                <XIcon className="h-6 w-6" /> 
+                <X className="h-5 w-5" /> 
             </button>
-            <div className="text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                </svg>
-                <h2 className="mt-4 text-2xl font-semibold text-slate-800">Add Transactions</h2>
-                <p className="mt-2 text-slate-600">
-                    Add your transaction SMS or email notifications one by one. Our AI will process them all at once.
+
+            <div className="relative mb-8">
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600">
+                        <Plus className="h-5 w-5" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-slate-900 tracking-tight">Add Expenses</h2>
+                </div>
+                <p className="text-sm text-slate-500"> 
+                    Paste bank SMS, digital receipts, or manual entries.
                 </p>
             </div>
             
-            <form onSubmit={handleAddText} className="mt-8">
-                <label htmlFor="transaction-text" className="block text-sm font-medium text-slate-700">New Transaction Message</label>
-                <div className="mt-1 flex gap-2">
+            <form onSubmit={handleAddText} className="mb-8">
+                <div className="group relative">
                     <textarea
                         id="transaction-text"
                         value={currentText}
                         onChange={(e) => setCurrentText(e.target.value)}
-                        placeholder="e.g., You spent ₹500 at Starbucks. Paste your multi-line messages here."
-                        className="flex-grow p-2 bg-white text-slate-900 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition resize-none"
-                        rows={3}
+                        placeholder="e.g., Spent ₹850 at Starbucks Indiranagar..."
+                        className="w-full p-4 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-4 focus:ring-slate-100 focus:border-slate-400 transition-all resize-none text-sm leading-relaxed placeholder:text-slate-400 min-h-[120px]"
                         disabled={isProcessing}
                     />
-                    <button
-                        type="submit"
-                        className="px-4 py-2 rounded-md font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400"
-                        disabled={!currentText.trim() || isProcessing}
-                    >
-                        Add
-                    </button>
+                    <div className="absolute right-3 bottom-0.5 transform -translate-y-2.5">
+                        <button
+                            type="submit"
+                            title="Add to queue"
+                            className="bg-slate-900 text-white p-2.5 rounded-lg hover:bg-slate-800 disabled:opacity-20 active:scale-95 transition-all"
+                            disabled={!currentText.trim() || isProcessing}
+                        >
+                            <Plus className="h-5 w-5" />
+                        </button>
+                    </div>
                 </div>
             </form>
 
-            {transactionTexts.length > 0 && (
-                <div className="mt-6">
-                    <h3 className="text-lg font-medium text-slate-700">Pending Transactions</h3>
-                    <ul className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-2 border rounded-lg p-2 bg-slate-50">
-                        {transactionTexts.map((text, index) => (
-                            <li key={index} className="flex items-center justify-between p-2 bg-white rounded-md text-sm text-slate-800 shadow-sm">
-                                <span className="flex-grow mr-2 truncate">{text}</span>
-                                <button 
-                                    onClick={() => handleRemoveText(index)} 
-                                    disabled={isProcessing} 
-                                    className="text-slate-400 hover:text-red-600 disabled:text-slate-300"
-                                    aria-label={`Remove transaction: ${text}`}
-                                >
-                                    <TrashIcon className="h-4 w-4" />
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
+            <AnimatePresence mode="popLayout">
+                {transactionTexts.length > 0 && (
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }} 
+                        exit={{ opacity: 0 }} 
+                        className="mb-8 p-5 bg-slate-50 rounded-xl border border-slate-100"
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <History className="h-4 w-4 text-slate-400" />
+                                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Queue</h3>
+                            </div>
+                            <span className="text-[11px] font-medium text-slate-400">{transactionTexts.length} pending</span>
+                        </div>
+                        <ul className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                            <AnimatePresence>
+                                {transactionTexts.map((text, index) => (
+                                    <motion.li 
+                                        layout
+                                        key={`${text}-${index}`} 
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: 10 }}
+                                        className="flex items-center justify-between p-3 bg-white rounded-lg text-xs text-slate-600 border border-slate-100 shadow-sm transition-shadow"
+                                    >
+                                        <span className="flex-grow mr-4 truncate">"{text}"</span>
+                                        <button 
+                                            onClick={() => handleRemoveText(index)} 
+                                            disabled={isProcessing} 
+                                            className="text-slate-300 hover:text-slate-600 transition-colors p-1"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                    </motion.li>
+                                ))}
+                            </AnimatePresence>
+                        </ul>
+                    </motion.div>
+                )}
+            </AnimatePresence>
             
-            {error && <p className="text-sm text-red-600 text-center mt-4">{error}</p>}
+            {error && (
+                <motion.div 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    className="p-3 bg-rose-50 border border-rose-100 rounded-lg flex items-center gap-2 mb-8 text-rose-600"
+                >
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    <p className="text-xs font-medium">{error}</p>
+                </motion.div>
+            )}
 
-            <div className="mt-8 border-t pt-6 space-y-4">
+            <div className="space-y-4">
                  <button
                     onClick={handleProcessAll}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 disabled:cursor-not-allowed"
+                    className="btn-primary w-full py-3.5 h-auto text-sm"
                     disabled={transactionTexts.length === 0 || isProcessing}
                 >
                     {isProcessing ? (
                         <>
-                            <SpinnerIcon className="h-5 w-5 text-white" />
-                            Processing...
+                            <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
+                            Processing Entries...
                         </>
                     ) : (
-                        `Process ${transactionTexts.length} Transaction${transactionTexts.length === 1 ? '' : 's'}`
+                        <>
+                            <Zap className="h-4 w-4 inline mr-2" />
+                            Add {transactionTexts.length} Transaction{transactionTexts.length === 1 ? '' : 's'}
+                        </>
                     )}
                 </button>
-                <div className="relative flex items-center">
-                    <div className="flex-grow border-t border-slate-300"></div>
-                    <span className="flex-shrink mx-4 text-slate-500 text-sm">Or</span>
-                    <div className="flex-grow border-t border-slate-300"></div>
-                </div>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                 <div className="grid grid-cols-2 gap-4">
                     <button
                         onClick={onScanReceipt}
-                        className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 transition-colors disabled:bg-slate-200 disabled:cursor-not-allowed"
+                        className="btn-secondary py-3 flex items-center justify-center gap-2"
                         disabled={isProcessing}
                     >
-                        <CameraIcon className="h-5 w-5" />
-                        Scan a Receipt
+                        <Camera className="h-4 w-4" />
+                        Scan Receipt
                     </button>
                     <button
                         onClick={onUploadReceipt}
-                        className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 transition-colors disabled:bg-slate-200 disabled:cursor-not-allowed"
+                        className="btn-secondary py-3 flex items-center justify-center gap-2"
                         disabled={isProcessing}
                     >
-                        <UploadIcon className="h-5 w-5" />
-                        Upload an Image
+                        <ImageIcon className="h-4 w-4" />
+                        Upload Media
                     </button>
                  </div>
             </div>

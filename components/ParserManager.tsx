@@ -1,7 +1,19 @@
 
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+    Binary, 
+    Plus, 
+    Trash2, 
+    ShieldCheck, 
+    Cpu, 
+    Braces, 
+    Tag, 
+    Info,
+    AlertCircle,
+    Terminal
+} from 'lucide-react';
 import { CustomParser } from '../types';
-import { TrashIcon } from './icons/TrashIcon';
 import ConfirmationModal from './ConfirmationModal';
 
 interface ParserManagerProps {
@@ -27,11 +39,11 @@ const ParserManager: React.FC<ParserManagerProps> = ({ customParsers, setCustomP
     const trimmedTemplate = newTemplate.trim();
 
     if (!trimmedName || !trimmedTemplate) {
-        setError("Both name and template are required.");
+        setError("Both name and template are mandatory for initialization.");
         return;
     }
     if (!trimmedTemplate.includes('{merchant}') || !trimmedTemplate.includes('{amount}') || !trimmedTemplate.includes('{date}')) {
-        setError("Template must include {merchant}, {amount}, and {date} placeholders.");
+        setError("Definition must include {merchant}, {amount}, and {date} logic tokens.");
         return;
     }
 
@@ -45,58 +57,152 @@ const ParserManager: React.FC<ParserManagerProps> = ({ customParsers, setCustomP
     if (parserToDelete) setCustomParsers(prev => prev.filter(p => p.id !== parserToDelete.id));
     setParserToDelete(null);
     setIsConfirmOpen(false);
-  };
-
-  return (
+  };    return (
     <>
-        <div className="flex flex-col lg:flex-row gap-8">
-            <div className="flex-1 order-2 lg:order-1">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Saved Formats</h3>
-                <div className="space-y-4">
-                    {BUILT_IN_PARSERS.map(p => (
-                        <div key={p.name} className="p-4 bg-slate-100 rounded-2xl">
-                            <p className="font-bold text-slate-700 text-sm">{p.name} <span className="ml-2 text-[10px] bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-widest">System</span></p>
-                            <pre className="mt-2 text-[11px] text-slate-500 whitespace-pre-wrap font-mono leading-tight">{p.example}</pre>
-                        </div>
-                    ))}
-                    {customParsers.map(p => (
-                        <div key={p.id} className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl shadow-sm">
-                            <div className="flex justify-between items-center mb-2">
-                                <p className="font-bold text-indigo-900 text-sm">{p.name}</p>
-                                <button onClick={() => { setParserToDelete(p); setIsConfirmOpen(true); }} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"><TrashIcon className="h-4 w-4"/></button>
+        <div className="flex flex-col lg:flex-row gap-10 items-start">
+            {/* Left Column: List of Parsers */}
+            <div className="flex-1 space-y-8 order-2 lg:order-1 w-full">
+                <div>
+                    <div className="flex items-center gap-2 mb-4">
+                        <Terminal className="h-4 w-4 text-slate-400" />
+                        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Parsing Rules</h3>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        <AnimatePresence mode="popLayout">
+                            {BUILT_IN_PARSERS.map((p, idx) => (
+                                <motion.div 
+                                    key={p.name} 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="p-4 bg-slate-50 rounded-xl border border-slate-100"
+                                >
+                                    <div className="flex items-center justify-between mb-3">
+                                        <p className="text-xs font-semibold text-slate-700 flex items-center gap-2">
+                                            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                                            {p.name}
+                                        </p>
+                                        <span className="text-[10px] font-medium text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">System</span>
+                                    </div>
+                                    <pre className="text-[11px] text-slate-500 whitespace-pre-wrap font-mono leading-relaxed bg-white border border-slate-100 p-3 rounded-lg">
+                                        {p.example}
+                                    </pre>
+                                </motion.div>
+                            ))}
+
+                            {customParsers.map((p, idx) => (
+                                <motion.div 
+                                    key={p.id} 
+                                    layout
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden"
+                                >
+                                    <div className="flex justify-between items-center mb-3 relative z-10">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-8 w-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600">
+                                                <Terminal className="h-4 w-4" />
+                                            </div>
+                                            <p className="text-xs font-semibold text-slate-900">{p.name}</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => { setParserToDelete(p); setIsConfirmOpen(true); }} 
+                                            className="p-1.5 text-slate-300 hover:text-slate-600 rounded-lg transition-all"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                    <pre className="text-[11px] text-slate-500 whitespace-pre-wrap font-mono leading-relaxed bg-slate-50 border border-slate-100 p-3 rounded-lg relative z-10">
+                                        {p.template}
+                                    </pre>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+
+                        {customParsers.length === 0 && (
+                            <div className="p-8 border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-300">
+                                <Braces className="h-8 w-8 mb-2 opacity-50" />
+                                <p className="text-[11px] font-medium uppercase tracking-wider">No custom rules</p>
                             </div>
-                            <pre className="text-[11px] text-indigo-700/70 whitespace-pre-wrap font-mono leading-tight bg-white/50 p-2 rounded-lg">{p.template}</pre>
-                        </div>
-                    ))}
+                        )}
+                    </div>
                 </div>
             </div>
 
-            <div className="flex-1 order-1 lg:order-2">
-                <div className="bg-white p-5 md:p-6 rounded-3xl border border-slate-200 shadow-sm sticky top-0">
-                    <h3 className="text-lg font-bold text-slate-800 mb-4">Custom Rule</h3>
-                    <form onSubmit={handleAddParser} className="space-y-4">
+            {/* Right Column: Add New Parser */}
+            <div className="w-full lg:w-96 order-1 lg:order-2 lg:sticky lg:top-0">
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                    <div className="flex items-center gap-2 mb-6">
+                        <Plus className="h-4 w-4 text-slate-400" />
+                        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">New Rule</h3>
+                    </div>
+
+                    <form onSubmit={handleAddParser} className="space-y-6">
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Friendly Name</label>
-                            <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g., Bank SMS" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm" />
+                            <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-2 block">
+                                Name
+                            </label>
+                            <input 
+                                type="text" 
+                                value={newName} 
+                                onChange={(e) => setNewName(e.target.value)} 
+                                placeholder="e.g., Bank SMS" 
+                                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:border-slate-400 outline-none text-sm font-medium text-slate-900" 
+                            />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Message Template</label>
-                            <textarea value={newTemplate} onChange={(e) => setNewTemplate(e.target.value)} placeholder="You spent {amount} at {merchant} on {date}." rows={4} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-mono" />
-                            <div className="mt-2 flex flex-wrap gap-2">
+                            <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-2 block">
+                                Pattern
+                            </label>
+                            <textarea 
+                                value={newTemplate} 
+                                onChange={(e) => setNewTemplate(e.target.value)} 
+                                placeholder="You spent {amount} at {merchant} on {date}." 
+                                rows={4} 
+                                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:border-slate-400 outline-none text-sm font-mono text-slate-700 resize-none" 
+                            />
+                            
+                            <div className="mt-4 flex flex-wrap gap-1.5">
                                 {['{amount}', '{merchant}', '{date}'].map(tag => (
-                                    <code key={tag} className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md font-bold">{tag}</code>
+                                    <code key={tag} className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{tag}</code>
                                 ))}
                             </div>
+
+                            <div className="mt-6 p-4 bg-white border border-slate-200 rounded-xl flex items-start gap-3">
+                                <Info className="h-3.5 w-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
+                                <p className="text-[11px] text-slate-500 leading-relaxed">
+                                    Use these tokens to tell the app how to read your transaction text.
+                                </p>
+                            </div>
                         </div>
-                        {error && <p className="text-xs text-red-500 font-bold bg-red-50 p-2 rounded-lg">{error}</p>}
-                        <button type="submit" className="w-full py-3.5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-100 mt-2">
-                            Add New Rule
+
+                        {error && (
+                            <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg flex items-center gap-2 text-rose-600">
+                                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                                <p className="text-[11px] font-medium">{error}</p>
+                            </div>
+                        )}
+
+                        <button 
+                            type="submit" 
+                            className="btn-primary w-full py-3"
+                        >
+                            Save Rule
                         </button>
                     </form>
                 </div>
             </div>
         </div>
-        <ConfirmationModal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} onConfirm={handleConfirmDelete} title="Remove Rule" message={parserToDelete && <>Remove <strong>"{parserToDelete.name}"</strong> custom rule?</>} confirmText="Delete" confirmVariant="danger" />
+        <ConfirmationModal 
+            isOpen={isConfirmOpen} 
+            onClose={() => setIsConfirmOpen(false)} 
+            onConfirm={handleConfirmDelete} 
+            title="Delete Rule" 
+            message={parserToDelete && <span className="text-slate-600">Remove the <strong>"{parserToDelete.name}"</strong> parsing rule?</span>} 
+            confirmText="Delete Rule" 
+            confirmVariant="danger" 
+        />
     </>
   );
 };

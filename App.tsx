@@ -1,57 +1,43 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { parseTransactionsFromText } from './services/geminiService';
 import { parseWithRules } from './services/ruleBasedParsers';
-import { Transaction, Expense, UnparseableTransaction, Budgets, CustomParser, AppData, AiConfirmationItem, RoadmapItem, AuthState } from './types';
+import { Transaction, Expense, UnparseableTransaction, Budgets, CustomParser, AppData, AiConfirmationItem, RoadmapItem } from './types';
 import TransactionCard from './components/TransactionCard';
 import UnparseableTransactionCard from './components/UnparseableTransactionCard';
 import AiConfirmationCard from './components/AiConfirmationCard';
 import ExpenseSummary from './components/ExpenseSummary';
 import ExpenseChart from './components/ExpenseChart';
-import { CheckCircleIcon } from './components/icons/CheckCircleIcon';
-import { SettingsIcon } from './components/icons/SettingsIcon';
-import { PlusIcon } from './components/icons/PlusIcon';
-import { LogIcon } from './components/icons/LogIcon';
+import { 
+    CheckCircle2, 
+    Settings as SettingsIcon, 
+    Plus as PlusIcon, 
+    History as LogIcon, 
+    ChevronLeft as ChevronLeftIcon, 
+    ChevronRight as ChevronRightIcon, 
+    TrendingUp as TrendingUpIcon,
+    Wallet as LogoIcon,
+    Loader2 as SpinnerIcon,
+    Download as DownloadIcon,
+    LayoutDashboard,
+    Calendar,
+    Filter
+} from 'lucide-react';
 import MessageProcessor from './components/MessageProcessor';
 import LogViewer from './components/LogViewer';
 import BudgetStatus from './components/BudgetStatus';
 import EmptyState from './components/EmptyState';
 import { DEFAULT_EXPENSE_CATEGORIES } from './constants';
 import { getWeeksInMonth, formatDateRange } from './utils/dateUtils';
-import { ChevronLeftIcon } from './components/icons/ChevronLeftIcon';
-import { ChevronRightIcon } from './components/icons/ChevronRightIcon';
 import { logService } from './services/logService';
 import Settings from './components/Settings';
 import Trends from './components/Trends';
-import { TrendingUpIcon } from './components/icons/TrendingUpIcon';
 import ReceiptScanner from './components/ReceiptScanner';
-import { LogoIcon } from './components/icons/LogoIcon';
-import { SpinnerIcon } from './components/icons/SpinnerIcon';
-import { DownloadIcon } from './components/icons/DownloadIcon';
-import { CloudIcon } from './components/icons/CloudIcon';
-import Login from './components/Login';
 
-const LOCAL_STORAGE_KEY = 'expense-tracker-data';
-const SESSION_AUTH_KEY = 'expense-tracker-vault-key';
-
-// Helper for Zero-Knowledge Hashing
-async function hashPassword(password: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+const LOCAL_STORAGE_KEY = 'expense-tracker-data-v2';
 
 const App: React.FC = () => {
-  const [auth, setAuth] = useState<AuthState>(() => {
-      const savedKey = sessionStorage.getItem(SESSION_AUTH_KEY);
-      return {
-          isAuthenticated: !!savedKey,
-          vaultKey: savedKey
-      };
-  });
-
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [unparseableTransactions, setUnparseableTransactions] = useState<UnparseableTransaction[]>([]);
   const [aiConfirmationQueue, setAiConfirmationQueue] = useState<AiConfirmationItem[]>([]);
@@ -64,8 +50,6 @@ const App: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [syncError, setSyncError] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -80,71 +64,36 @@ const App: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
 
-  const handleLogin = async (password: string) => {
-      const hashed = await hashPassword(password);
-      sessionStorage.setItem(SESSION_AUTH_KEY, hashed);
-      setAuth({ isAuthenticated: true, vaultKey: hashed });
-  };
-
-  const handleLogout = () => {
-      sessionStorage.removeItem(SESSION_AUTH_KEY);
-      setAuth({ isAuthenticated: false, vaultKey: null });
-  };
-
   useEffect(() => {
-    if (!auth.isAuthenticated || !auth.vaultKey) return;
-
     const initData = async () => {
         setIsLoading(true);
-        logService.addLog("Unlocking zero-knowledge vault...", "info");
+        logService.addLog("Loading data from local storage...", "info");
         
-        let loadedData: AppData | null = null;
-
-        // 1. Try Local Storage first for speed
         try {
-            const localDataString = localStorage.getItem(`${LOCAL_STORAGE_KEY}_${auth.vaultKey}`);
+            const localDataString = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (localDataString) {
-                loadedData = JSON.parse(localDataString);
-                logService.addLog("Loaded cached data from device.", "info");
+                const loadedData: AppData = JSON.parse(localDataString);
+                setCategorizedExpenses(loadedData.categorizedExpenses || []);
+                setBudgets(loadedData.budgets || {});
+                setCategories(loadedData.categories && loadedData.categories.length > 0 ? loadedData.categories : [...DEFAULT_EXPENSE_CATEGORIES]);
+                setCustomParsers(loadedData.customParsers || []);
+                setRoadmap(loadedData.roadmap || []);
+                logService.addLog("Data loaded successfully.", "info");
             }
         } catch (e) {
             console.warn("Failed to parse local storage data:", e);
-        }
-
-        // 2. Try Cloud for freshest data
-        try {
-            const response = await fetch('/api/data', {
-                headers: { 'x-vault-key': auth.vaultKey || '' }
-            });
-            if (response.ok) {
-                const cloudData = await response.json();
-                if (cloudData && Object.keys(cloudData).length > 0) {
-                    loadedData = cloudData;
-                    logService.addLog("Synced freshest data from Cloud Vault.", "info");
-                }
-            }
-        } catch (e) {
-            console.warn("Cloud sync currently unavailable.", e);
-        }
-
-        if (loadedData) {
-            setCategorizedExpenses(loadedData.categorizedExpenses || []);
-            setBudgets(loadedData.budgets || {});
-            setCategories(loadedData.categories && loadedData.categories.length > 0 ? loadedData.categories : [...DEFAULT_EXPENSE_CATEGORIES]);
-            setCustomParsers(loadedData.customParsers || []);
-            setRoadmap(loadedData.roadmap || []);
         }
         
         setIsLoading(false);
     };
 
     initData();
-  }, [auth.isAuthenticated, auth.vaultKey]);
+  }, []);
 
   useEffect(() => {
-    if (isLoading || !auth.isAuthenticated || !auth.vaultKey) return;
+    if (isLoading) return;
 
-    const handler = setTimeout(async () => {
+    const handler = setTimeout(() => {
         const dataToSave: AppData = {
             categorizedExpenses,
             budgets,
@@ -153,33 +102,12 @@ const App: React.FC = () => {
             roadmap,
         };
 
-        // Save local copy
-        localStorage.setItem(`${LOCAL_STORAGE_KEY}_${auth.vaultKey}`, JSON.stringify(dataToSave));
-
-        // Sync with Cloud
-        setIsSyncing(true);
-        setSyncError(false);
-        try {
-            const response = await fetch('/api/data', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-vault-key': auth.vaultKey || ''
-                },
-                body: JSON.stringify(dataToSave)
-            });
-            if (!response.ok) throw new Error("Sync failed");
-            logService.addLog("Cloud Vault synchronized.", "info");
-        } catch (e) {
-            console.error("Cloud sync failed", e);
-            setSyncError(true);
-        } finally {
-            setIsSyncing(false);
-        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
+        logService.addLog("Data auto-saved to device.", "info");
     }, 1500);
 
     return () => clearTimeout(handler);
-  }, [categorizedExpenses, budgets, categories, customParsers, roadmap, isLoading, auth.isAuthenticated, auth.vaultKey]);
+  }, [categorizedExpenses, budgets, categories, customParsers, roadmap, isLoading]);
 
   const hasNoData = useMemo(() => 
     pendingTransactions.length === 0 && 
@@ -276,6 +204,13 @@ const App: React.FC = () => {
     setPendingTransactions(prev => prev.filter(t => t.id !== transaction.id));
   };
 
+  const handleUpdateExpenseCategory = (id: string, category: string) => {
+      setCategorizedExpenses(prev => prev.map(expense => 
+          expense.id === id ? { ...expense, category } : expense
+      ));
+      logService.addLog(`Updated category for expense to "${category}".`, "info");
+  };
+
   const handleIgnore = (id: string) => setPendingTransactions(prev => prev.filter(t => t.id !== id));
   const handleIgnoreUnparseable = (id: string) => setUnparseableTransactions(prev => prev.filter(t => t.id !== id));
   
@@ -335,99 +270,142 @@ const App: React.FC = () => {
         URL.revokeObjectURL(url);
   };
 
-  if (!auth.isAuthenticated) return <Login onLogin={handleLogin} />;
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-100"><div className="text-center"><SpinnerIcon className="h-12 w-12 text-indigo-600 mx-auto mb-4" /><p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Unlocking Vault...</p></div></div>;
+    if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center"><SpinnerIcon className="h-10 w-10 text-slate-400 mx-auto mb-4 animate-spin" /><p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Syncing Data</p></motion.div></div>;
 
-  return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-      <header className="bg-white/80 backdrop-blur-lg sticky top-0 z-40 shadow-sm border-b border-slate-200">
-        <div className="container mx-auto px-4 sm:px-6">
-            <div className="flex items-center justify-between h-16 md:h-20">
-                <div className="flex items-center gap-2">
-                    <LogoIcon className="h-7 w-7 md:h-8 md:w-8 text-indigo-600" />
-                    <h1 className="text-lg md:text-xl font-bold text-slate-800 hidden xs:block">Vault Tracker</h1>
+    return (
+        <div className="min-h-screen bg-[#fcfcfd] flex flex-col selection:bg-slate-900 selection:text-white">
+            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+                <div className="container mx-auto px-4 md:px-8">
+                    <div className="flex items-center justify-between h-16">
+                        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3">
+                            <div className="h-8 w-8 bg-slate-900 rounded-lg flex items-center justify-center">
+                                <LogoIcon className="h-4 w-4 text-white" />
+                            </div>
+                            <h1 className="text-lg font-bold text-slate-900 tracking-tight">Spendwise</h1>
+                        </motion.div>
+
+                        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2">
+                            <div className="hidden sm:flex items-center bg-slate-50 rounded-lg p-1 border border-slate-200">
+                                <button onClick={() => setIsAnalysisOpen(true)} className="p-1.5 rounded-md text-slate-500 hover:bg-white hover:text-slate-900 hover:shadow-sm transition-all" title="Analysis"><TrendingUpIcon className="h-4 w-4"/></button>
+                                <button onClick={handleExportJson} className="p-1.5 rounded-md text-slate-500 hover:bg-white hover:text-slate-900 hover:shadow-sm transition-all" title="Export"><DownloadIcon className="h-4 w-4"/></button>
+                                <button onClick={() => setIsViewingLogs(true)} className="p-1.5 rounded-md text-slate-500 hover:bg-white hover:text-slate-900 hover:shadow-sm transition-all" title="Logs"><LogIcon className="h-4 w-4"/></button>
+                                <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 rounded-md text-slate-500 hover:bg-white hover:text-slate-900 hover:shadow-sm transition-all" title="Settings"><SettingsIcon className="h-4 w-4"/></button>
+                            </div>
+
+                            <button onClick={() => setIsAddingTransactions(true)} className="btn-primary h-9 px-4 text-sm">
+                                <PlusIcon className="h-4 w-4 inline mr-1"/><span className="hidden xs:inline">Add Expense</span>
+                            </button>
+                            
+                            <button onClick={() => setIsSettingsOpen(true)} className="sm:hidden p-2 rounded-lg bg-slate-50 text-slate-500 border border-slate-200"><SettingsIcon className="h-4 w-4"/></button>
+                        </motion.div>
+                    </div>
                 </div>
+            </header>
+            
+            <main className="container mx-auto px-4 md:px-8 py-8 flex-grow">
+                <AnimatePresence mode="wait">
+                    {isAddingTransactions && !isScanningReceipt && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mb-8 max-w-4xl mx-auto">
+                            <MessageProcessor onProcess={processAllTransactions} isProcessing={isProcessing} error={error} onScanReceipt={() => { setScanMode('camera'); setIsScanningReceipt(true); }} onUploadReceipt={() => { setScanMode('upload'); setIsScanningReceipt(true); }} onClose={() => { setIsAddingTransactions(false); setPendingTextTransactions([]); }} transactionTexts={pendingTextTransactions} setTransactionTexts={setPendingTextTransactions} />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                <div className="flex items-center gap-1 md:gap-2">
-                    <div className="px-2" title={isSyncing ? "Saving..." : "Synced"}>
-                        <CloudIcon className={`h-5 w-5 ${isSyncing ? 'text-indigo-400 animate-pulse' : syncError ? 'text-red-500' : 'text-green-500'}`} />
-                    </div>
-                    
-                    <div className="flex items-center bg-slate-100 rounded-full p-1 overflow-x-auto no-scrollbar max-w-[120px] sm:max-w-none">
-                        <button onClick={() => setIsAnalysisOpen(true)} className="p-2 rounded-full text-slate-600 hover:bg-white hover:text-indigo-600 transition-all shrink-0"><TrendingUpIcon className="h-5 w-5"/></button>
-                        <button onClick={handleExportJson} className="p-2 rounded-full text-slate-600 hover:bg-white hover:text-indigo-600 transition-all shrink-0"><DownloadIcon className="h-5 w-5"/></button>
-                        <button onClick={() => setIsViewingLogs(true)} className="p-2 rounded-full text-slate-600 hover:bg-white hover:text-indigo-600 transition-all shrink-0"><LogIcon className="h-5 w-5"/></button>
-                        <button onClick={() => setIsSettingsOpen(true)} className="p-2 rounded-full text-slate-600 hover:bg-white hover:text-indigo-600 transition-all shrink-0"><SettingsIcon className="h-5 w-5"/></button>
-                        <button onClick={handleLogout} className="p-2 rounded-full text-slate-400 hover:text-red-500 transition-all shrink-0 ml-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
-                        </button>
-                    </div>
-
-                    <button onClick={() => setIsAddingTransactions(true)} className="flex items-center gap-2 ml-1 md:ml-2 px-4 py-2 text-sm font-semibold rounded-full text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all shadow-md shadow-indigo-200">
-                        <PlusIcon className="h-5 w-5"/><span className="hidden md:inline">Add</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-      </header>
-      
-      <main className="container mx-auto p-4 md:p-8 flex-grow">
-        {isAddingTransactions && !isScanningReceipt && (
-            <div className="mb-8"><MessageProcessor onProcess={processAllTransactions} isProcessing={isProcessing} error={error} onScanReceipt={() => { setScanMode('camera'); setIsScanningReceipt(true); }} onUploadReceipt={() => { setScanMode('upload'); setIsScanningReceipt(true); }} onClose={() => { setIsAddingTransactions(false); setPendingTextTransactions([]); }} transactionTexts={pendingTextTransactions} setTransactionTexts={setPendingTextTransactions} /></div>
-        )}
-
-        {hasNoData && !isAddingTransactions ? <EmptyState onAddTransactions={() => setIsAddingTransactions(true)} /> : (
-             <div className="space-y-6 md:space-y-8">
-                <div className="bg-white/90 backdrop-blur-md p-2 md:p-3 rounded-full shadow-lg border border-slate-200/80 flex items-center justify-between sticky top-[72px] md:top-[88px] z-30">
-                    <button onClick={() => navigateDate('prev')} className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors"><ChevronLeftIcon /></button>
-                    <div className="flex-grow text-center flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-4">
-                        <span className="font-bold text-slate-700 text-sm md:text-base">{dateDisplay}</span>
-                        <div className="inline-flex p-1 bg-slate-100 rounded-full text-[10px] md:text-xs">
-                            <button onClick={() => setViewMode('day')} className={`px-3 py-1 rounded-full font-bold transition-all ${viewMode === 'day' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>DAY</button>
-                            <button onClick={() => setViewMode('week')} className={`px-3 py-1 rounded-full font-bold transition-all ${viewMode === 'week' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>WEEK</button>
-                            <button onClick={() => setViewMode('month')} className={`px-3 py-1 rounded-full font-bold transition-all ${viewMode === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>MONTH</button>
-                        </div>
-                    </div>
-                    <button onClick={() => navigateDate('next')} className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors"><ChevronRightIcon /></button>
-                </div>
-                
-                {currentAiConfirmation ? (
-                    <div className="p-4 md:p-6 bg-cyan-50/50 border-2 border-dashed border-cyan-200 rounded-3xl animate-in fade-in slide-in-from-top-4 duration-500">
-                        <h2 className="text-lg md:text-xl font-bold text-cyan-800 mb-4 px-2">Verify AI Suggestion ({aiConfirmationQueue.length})</h2>
-                        <AiConfirmationCard key={currentAiConfirmation.id} item={currentAiConfirmation} onConfirm={handleAiConfirm} onDiscard={handleAiDiscard} />
-                    </div>
-                ) : currentTransaction ? (
-                    <div className="p-4 md:p-6 bg-indigo-50/50 border-2 border-dashed border-indigo-200 rounded-3xl">
-                        <h2 className="text-lg md:text-xl font-bold text-indigo-800 mb-4 px-2">Categorize Pending ({pendingTransactions.length})</h2>
-                        <TransactionCard key={currentTransaction.id} transaction={currentTransaction} onIgnore={() => handleIgnore(currentTransaction.id)} onCategorize={(category) => handleCategorize(currentTransaction, category)} categories={categories} />
-                    </div>
-                ) : currentUnparseable ? (
-                     <div className="p-4 md:p-6 bg-amber-50/50 border-2 border-dashed border-amber-200 rounded-3xl">
-                        <h2 className="text-lg md:text-xl font-bold text-amber-800 mb-4 px-2">Manual Entry Needed</h2>
-                        <UnparseableTransactionCard key={currentUnparseable.id} item={currentUnparseable} onIgnore={handleIgnoreUnparseable} onManualAdd={handleManualAdd} />
-                    </div>
+                {hasNoData && !isAddingTransactions ? (
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                        <EmptyState onAddTransactions={() => setIsAddingTransactions(true)} />
+                    </motion.div>
                 ) : (
-                     <div className="p-8 md:p-12 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center">
-                        <CheckCircleIcon /><h2 className="text-xl md:text-2xl font-bold text-slate-800 mt-4 italic">Spotless!</h2>
-                        <p className="text-slate-500 mt-2">All transactions in this view are categorized.</p>
-                     </div>
-                )}
-                
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 items-start">
-                    <BudgetStatus expenses={visibleExpenses} budgets={budgets} />
-                    <ExpenseChart data={chartData} />
-                </div>
-                <ExpenseSummary expenses={visibleExpenses} onDeleteExpense={handleDeleteExpense} />
-            </div>
-        )}
-      </main>
+                     <div className="space-y-10 md:space-y-16">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center sticky top-[80px] md:top-[90px] z-30">
+                            <div className="bg-white/90 backdrop-blur-md px-2 py-2 rounded-2xl flex items-center gap-1 shadow-xl shadow-slate-200/40 border border-slate-200">
+                                <button onClick={() => navigateDate('prev')} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-slate-900 transition-colors"><ChevronLeftIcon className="h-5 w-5" /></button>
+                                
+                                <div className="flex items-center gap-4 px-4">
+                                    <span className="font-bold text-slate-900 text-sm md:text-base min-w-[140px] text-center tracking-tight">{dateDisplay}</span>
+                                    <div className="hidden sm:flex p-1 bg-slate-50 rounded-xl text-[10px] font-bold border border-slate-100">
+                                        <button onClick={() => setViewMode('day')} className={`px-3 py-1 rounded-lg transition-all ${viewMode === 'day' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>DAY</button>
+                                        <button onClick={() => setViewMode('week')} className={`px-3 py-1 rounded-lg transition-all ${viewMode === 'week' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>WEEK</button>
+                                        <button onClick={() => setViewMode('month')} className={`px-3 py-1 rounded-lg transition-all ${viewMode === 'month' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>MONTH</button>
+                                    </div>
+                                </div>
 
-      {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} categories={categories} setCategories={setCategories} categorizedExpenses={categorizedExpenses} budgets={budgets} setBudgets={setBudgets} customParsers={customParsers} setCustomParsers={setCustomParsers} roadmap={roadmap} setRoadmap={setRoadmap} onImportData={handleImportData} onExportJson={handleExportJson} />}
-      {isViewingLogs && <LogViewer onClose={() => setIsViewingLogs(false)} />}
-      {isAnalysisOpen && <Trends onClose={() => setIsAnalysisOpen(false)} initialTab="trends" expenses={categorizedExpenses} categories={categories} />}
-      {isScanningReceipt && <ReceiptScanner onClose={() => setIsScanningReceipt(false)} onReceiptParsed={handleReceiptParsed} initialMode={scanMode} />}
-    </div>
-  );
+                                <button onClick={() => navigateDate('next')} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-slate-900 transition-colors"><ChevronRightIcon className="h-5 w-5" /></button>
+                            </div>
+                        </motion.div>
+                        
+                        <AnimatePresence mode="popLayout">
+                            {currentAiConfirmation && (
+                                <motion.div key={currentAiConfirmation.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm max-w-5xl mx-auto overflow-hidden">
+                                    <div className="flex items-center gap-3 mb-8">
+                                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs">{aiConfirmationQueue.length}</span>
+                                        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Review Extraction</h2>
+                                    </div>
+                                    <AiConfirmationCard item={currentAiConfirmation} onConfirm={handleAiConfirm} onDiscard={handleAiDiscard} />
+                                </motion.div>
+                            )}
+
+                            {currentTransaction && !currentAiConfirmation && (
+                                <motion.div key={currentTransaction.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm max-w-5xl mx-auto overflow-hidden">
+                                     <div className="flex items-center gap-3 mb-8">
+                                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs">{pendingTransactions.length}</span>
+                                        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Categorize Expense</h2>
+                                    </div>
+                                    <TransactionCard transaction={currentTransaction} onIgnore={() => handleIgnore(currentTransaction.id)} onCategorize={(category) => handleCategorize(currentTransaction, category)} categories={categories} />
+                                </motion.div>
+                            )}
+
+                            {currentUnparseable && !currentTransaction && !currentAiConfirmation && (
+                                <motion.div key={currentUnparseable.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm max-w-5xl mx-auto overflow-hidden">
+                                    <h2 className="text-xl font-bold text-slate-900 mb-8 tracking-tight">Manual Input Needed</h2>
+                                    <UnparseableTransactionCard item={currentUnparseable} onIgnore={handleIgnoreUnparseable} onManualAdd={handleManualAdd} />
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {!currentAiConfirmation && !currentTransaction && !currentUnparseable && visibleExpenses.length > 0 && (
+                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-10 px-8 bg-slate-50 border border-slate-200 rounded-3xl group">
+                                <div className="h-12 w-12 bg-white rounded-xl shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                                     <CheckCircle2 className="h-6 w-6 text-slate-900" />
+                                </div>
+                                <h2 className="text-xl font-bold text-slate-900 mt-4 tracking-tight">Zero Pending</h2>
+                                <p className="text-slate-400 mt-2 text-sm text-center max-w-xs font-medium">Your financial feed is completely organized and up to date.</p>
+                             </motion.div>
+                        )}
+                        
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+                            <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
+                                <BudgetStatus expenses={visibleExpenses} budgets={budgets} />
+                            </motion.div>
+                            <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}>
+                                <ExpenseChart data={chartData} />
+                            </motion.div>
+                        </div>
+
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                            <ExpenseSummary 
+                              expenses={visibleExpenses} 
+                              onDeleteExpense={handleDeleteExpense} 
+                              onUpdateCategory={handleUpdateExpenseCategory}
+                              categories={categories}
+                            />
+                        </motion.div>
+                    </div>
+                )}
+            </main>
+
+            <AnimatePresence>
+                {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} categories={categories} setCategories={setCategories} categorizedExpenses={categorizedExpenses} budgets={budgets} setBudgets={setBudgets} customParsers={customParsers} setCustomParsers={setCustomParsers} roadmap={roadmap} setRoadmap={setRoadmap} onImportData={handleImportData} onExportJson={handleExportJson} />}
+                {isViewingLogs && <LogViewer onClose={() => setIsViewingLogs(false)} />}
+                {isAnalysisOpen && <Trends onClose={() => setIsAnalysisOpen(false)} initialTab="trends" expenses={categorizedExpenses} categories={categories} />}
+                {isScanningReceipt && <ReceiptScanner onClose={() => setIsScanningReceipt(false)} onReceiptParsed={handleReceiptParsed} initialMode={scanMode} />}
+            </AnimatePresence>
+            
+            <footer className="py-12 border-t border-slate-100 mt-auto text-center">
+                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-300">Privacy First • Local Data Storage • India</p>
+            </footer>
+        </div>
+    );
 };
 
 export default App;

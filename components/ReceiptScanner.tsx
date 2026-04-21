@@ -122,30 +122,32 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({ onClose, onReceiptParse
         switch (view) {
             case 'camera':
                 return (
-                    <div className="relative w-full h-full bg-black flex flex-col items-center justify-center">
+                    <div className="relative w-full h-full bg-slate-900 flex flex-col items-center justify-center">
                         <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
-                        <div className="absolute bottom-6 flex justify-center">
-                            <button onClick={handleCapture} className="h-20 w-20 rounded-full bg-white/30 border-4 border-white flex items-center justify-center backdrop-blur-sm" aria-label="Capture receipt photo">
-                                <div className="h-16 w-16 rounded-full bg-white"></div>
+                        <div className="absolute bottom-10 flex justify-center">
+                            <button onClick={handleCapture} className="h-16 w-16 rounded-full bg-white/20 border-2 border-white flex items-center justify-center backdrop-blur-md active:scale-95 transition-transform" aria-label="Capture receipt photo">
+                                <div className="h-12 w-12 rounded-full bg-white shadow-lg"></div>
                             </button>
                         </div>
                     </div>
                 );
             case 'upload':
                 return (
-                    <div className="w-full h-full p-6 flex flex-col items-center justify-center">
+                    <div className="w-full h-full p-8 flex flex-col items-center justify-center">
                         <label 
                             htmlFor="file-upload"
-                            className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+                            className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-3xl bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer group"
                             onDragOver={handleDragOver}
                             onDrop={handleDrop}
                         >
                             <div className="text-center p-4">
-                                <UploadIcon className="mx-auto h-12 w-12 text-slate-400" />
-                                <p className="mt-4 block text-lg font-semibold text-slate-800">
-                                    Drop receipt image here
+                                <div className="h-16 w-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                                    <UploadIcon className="h-8 w-8 text-slate-400" />
+                                </div>
+                                <p className="text-lg font-bold text-slate-900 tracking-tight">
+                                    Capture or Drop
                                 </p>
-                                <p className="mt-1 text-sm text-slate-500">or click to upload</p>
+                                <p className="mt-2 text-sm text-slate-500 font-medium">Select a receipt photo to analyze</p>
                                 <input
                                     id="file-upload"
                                     type="file"
@@ -153,27 +155,39 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({ onClose, onReceiptParse
                                     accept="image/*"
                                     onChange={(e) => handleFileSelect(e.target.files ? e.target.files[0] : null)}
                                 />
-                                {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+                                {error && (
+                                    <div className="mt-6 p-3 bg-red-50 text-red-600 rounded-xl text-xs font-medium border border-red-100">
+                                        {error}
+                                    </div>
+                                )}
                             </div>
                         </label>
                     </div>
                 );
             case 'loading':
                 return (
-                    <div className="relative w-full h-full bg-slate-200 flex flex-col items-center justify-center">
-                        {imageSrc && <img src={imageSrc} alt="Captured receipt" className="max-w-full max-h-full object-contain opacity-50" />}
-                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white p-4">
-                            <SpinnerIcon className="h-12 w-12 text-white" />
-                            <p className="mt-4 text-lg font-semibold">Analyzing your receipt...</p>
+                    <div className="relative w-full h-full bg-slate-50 flex flex-col items-center justify-center">
+                        {imageSrc && <img src={imageSrc} alt="Captured receipt" className="max-w-full max-h-full object-contain opacity-20" />}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+                            <div className="h-16 w-16 bg-white rounded-2xl shadow-xl flex items-center justify-center mb-6">
+                                <SpinnerIcon className="h-8 w-8 text-slate-900 animate-spin" />
+                            </div>
+                            <p className="text-lg font-bold text-slate-900 tracking-tight">Extracting Data</p>
+                            <p className="mt-2 text-sm text-slate-500 font-medium">Gemini is processing your receipt...</p>
                         </div>
                     </div>
                 );
             case 'error':
                  return (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
-                        <h3 className="text-xl font-bold text-slate-800 mb-4">Parsing Failed</h3>
-                        <p className="bg-red-100 text-red-800 p-3 rounded-md mb-6 max-w-md">{error}</p>
-                        <button onClick={handleReset} className="w-full sm:w-auto px-6 py-2 rounded-lg font-semibold text-slate-700 bg-slate-200 hover:bg-slate-300">
+                    <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-white">
+                        <div className="h-16 w-16 bg-red-50 rounded-2xl flex items-center justify-center mb-6 text-red-500">
+                            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 tracking-tight mb-2">Analysis Failed</h3>
+                        <p className="text-slate-500 font-medium mb-8 max-w-sm mx-auto">{error}</p>
+                        <button onClick={handleReset} className="btn-primary w-full sm:w-auto px-10">
                             Try Again
                         </button>
                     </div>
@@ -183,18 +197,21 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({ onClose, onReceiptParse
     
     return (
         <div 
-            className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 md:p-8"
             onClick={onClose}
         >
              <div 
-                className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col relative"
+                className="bg-slate-50 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col relative overflow-hidden board-white/20"
                 onClick={(e) => e.stopPropagation()}
             >
-                <button onClick={onClose} className="absolute top-2 right-2 text-white bg-black/40 rounded-full p-1 z-10" aria-label="Close scanner">
-                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0-0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                <div className="flex-grow">
+                    {renderContent()}
+                </div>
+                
+                <button onClick={onClose} className="absolute top-4 right-4 bg-black/10 hover:bg-black/20 text-white rounded-full p-2 transition-colors z-[120]" aria-label="Close scanner">
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
                 <canvas ref={canvasRef} className="hidden"></canvas>
-                {renderContent()}
              </div>
         </div>
     );

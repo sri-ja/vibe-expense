@@ -58,8 +58,3 @@ export interface AiConfirmationItem {
   imageDataUrl?: string;
   parsedData: Omit<Transaction, 'id'>;
 }
-
-export interface AuthState {
-  isAuthenticated: boolean;
-  vaultKey: string | null;
-}

@@ -1,8 +1,8 @@
 
 import React, { useRef, useState } from 'react';
-import { AppData, Expense } from '../types';
-import { UploadIcon } from './icons/UploadIcon';
+import { Download, FileJson, FileSpreadsheet, Upload } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
+import { AppData, Expense } from '../types';
 
 interface DataManagerProps {
   appData: AppData;
@@ -18,7 +18,6 @@ const DataManager: React.FC<DataManagerProps> = ({ appData, onImport, onExportJs
 
     const handleExportCsv = () => {
         if (categorizedExpenses.length === 0) {
-            alert("No categorized expenses to export.");
             return;
         }
 
@@ -60,22 +59,18 @@ const DataManager: React.FC<DataManagerProps> = ({ appData, onImport, onExportJs
                 const importedData = JSON.parse(text);
 
                 if (typeof importedData !== 'object' || importedData === null || Array.isArray(importedData)) {
-                    throw new Error('Invalid data file format. The file must contain a JSON object.');
+                    throw new Error('Invalid format');
                 }
                 
                 setDataToImport(importedData);
                 setIsConfirmOpen(true);
 
             } catch (error: any) {
-                alert(`Error importing data: ${error.message}`);
                 if (fileInputRef.current) {
                     fileInputRef.current.value = '';
                 }
             }
         };
-        reader.onerror = () => {
-             alert('Error reading the file.');
-        }
         reader.readAsText(file);
     };
 
@@ -96,34 +91,39 @@ const DataManager: React.FC<DataManagerProps> = ({ appData, onImport, onExportJs
 
     return (
         <>
-            <div className="w-full max-w-lg mx-auto space-y-8">
+            <div className="w-full max-w-lg mx-auto space-y-6">
                 {/* Export Section */}
-                <div className="bg-white p-6 rounded-lg border">
-                    <h3 className="text-lg font-semibold text-slate-700 mb-4">Export Data</h3>
+                <div className="bg-white p-6 rounded-2xl border border-slate-200">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Download className="h-4 w-4 text-slate-400" />
+                        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Export Backups</h3>
+                    </div>
                     <div className="space-y-3">
-                        <p className="text-sm text-slate-600">
-                            Download your data (including roadmap, budgets, and settings) for backup.
-                        </p>
                         <button
                             onClick={onExportJson}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md font-semibold text-white bg-indigo-600 hover:bg-indigo-700"
+                            className="w-full btn-primary h-auto py-3 text-sm flex items-center justify-center gap-2"
                         >
-                            Export as JSON (.json)
+                            <FileJson className="h-4 w-4" />
+                            Export Data (.json)
                         </button>
                         <button
                             onClick={handleExportCsv}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200"
+                            className="w-full btn-secondary h-auto py-3 text-sm flex items-center justify-center gap-2"
                         >
-                            Export Expenses as CSV (.csv)
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Export Expenses (.csv)
                         </button>
                     </div>
                 </div>
 
                 {/* Import Section */}
-                <div className="bg-white p-6 rounded-lg border">
-                     <h3 className="text-lg font-semibold text-slate-700 mb-4">Import Data</h3>
-                     <p className="text-sm text-slate-600 mb-3">
-                        Import data from a previously exported JSON file. This will replace all existing data, including roadmap notes.
+                <div className="bg-white p-6 rounded-2xl border border-slate-200">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Upload className="h-4 w-4 text-slate-400" />
+                        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Import Data</h3>
+                    </div>
+                    <p className="text-xs text-slate-500 italic mb-4">
+                        Warning: Importing will replace all existing sessions and settings.
                     </p>
                     <input
                         type="file"
@@ -134,10 +134,10 @@ const DataManager: React.FC<DataManagerProps> = ({ appData, onImport, onExportJs
                     />
                     <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300"
+                        className="w-full btn-secondary h-auto py-3 text-sm flex items-center justify-center gap-2"
                     >
-                        <UploadIcon className="h-5 w-5" />
-                        Import from JSON
+                        <Upload className="h-4 w-4" />
+                        Restore from JSON
                     </button>
                 </div>
             </div>
@@ -145,18 +145,14 @@ const DataManager: React.FC<DataManagerProps> = ({ appData, onImport, onExportJs
                 isOpen={isConfirmOpen}
                 onClose={handleCloseConfirm}
                 onConfirm={handleConfirmImport}
-                title="Confirm Data Import"
+                title="Overwrite Local Data?"
                 message={
-                    <>
-                        Are you sure you want to import this file?
-                        <br />
-                        <strong>This action will overwrite all your current data.</strong>
-                        <br />
-                        This action cannot be undone.
-                    </>
+                    <span className="text-slate-600">
+                        This will delete all current expenses and settings and replace them with the imported file. <strong>This cannot be undone.</strong>
+                    </span>
                 }
-                confirmText="Import"
-                confirmVariant="primary"
+                confirmText="Yes, Import"
+                confirmVariant="danger"
             />
         </>
     );

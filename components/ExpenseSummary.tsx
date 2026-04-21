@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Expense } from '../types';
 import { getCategoryColor } from '../utils/colorUtils';
 import { TrashIcon } from './icons/TrashIcon';
@@ -10,15 +11,24 @@ import { ChevronDownIcon } from './icons/ChevronDownIcon';
 interface ExpenseSummaryProps {
   expenses: Expense[];
   onDeleteExpense: (id: string) => void;
+  onUpdateCategory: (id: string, category: string) => void;
+  categories: string[];
 }
 
-const ExpenseSummary: React.FC<ExpenseSummaryProps> = ({ expenses, onDeleteExpense }) => {
+const ExpenseSummary: React.FC<ExpenseSummaryProps> = ({ 
+  expenses, 
+  onDeleteExpense, 
+  onUpdateCategory,
+  categories 
+}) => {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   
   const [filterCategory, setFilterCategory] = useState('All');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  const editCategoryRef = useRef<HTMLDivElement>(null);
 
   const availableCategories = useMemo(() => {
     const uniqueCategories = new Set(expenses.map(e => e.category));
@@ -36,16 +46,20 @@ const ExpenseSummary: React.FC<ExpenseSummaryProps> = ({ expenses, onDeleteExpen
         if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
             setIsFilterOpen(false);
         }
+        if (editCategoryRef.current && !editCategoryRef.current.contains(event.target as Node)) {
+            setEditingCategoryId(null);
+        }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const filteredExpenses = useMemo(() => {
+    const sorted = [...expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     if (filterCategory === 'All') {
-      return expenses;
+      return sorted;
     }
-    return expenses.filter(expense => expense.category === filterCategory);
+    return sorted.filter(expense => expense.category === filterCategory);
   }, [expenses, filterCategory]);
 
   const handleOpenConfirm = (expense: Expense) => {
@@ -69,112 +83,168 @@ const ExpenseSummary: React.FC<ExpenseSummaryProps> = ({ expenses, onDeleteExpen
     setFilterCategory(category);
     setIsFilterOpen(false);
   };
+
+  const handleUpdateCategory = (id: string, newCategory: string) => {
+    onUpdateCategory(id, newCategory);
+    setEditingCategoryId(null);
+  };
   
   const renderEmptyState = () => (
-     <div className="text-center py-10">
-        <p className="text-slate-500">
+     <div className="text-center py-16 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+        <p className="text-sm font-medium text-slate-500">
             {expenses.length === 0 
-                ? "No expenses found for this period." 
-                : `No expenses found for the "${filterCategory}" category.`}
+                ? "No expenses yet" 
+                : `No ${filterCategory} expenses`}
         </p>
-        <p className="text-sm text-slate-400">
+        <p className="text-xs text-slate-400 mt-1">
             {expenses.length === 0
-                ? "Your categorized expenses for this date range will appear here."
-                : "Try selecting a different category or 'All'."}
+                ? "Add your first expense to get started."
+                : "Try a different filter."}
         </p>
     </div>
   );
 
-  if (expenses.length === 0) {
-    return (
-      <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200/80">
-        <h2 className="text-2xl font-semibold text-slate-700 mb-4 border-b pb-3">Expense History</h2>
-        {renderEmptyState()}
-      </div>
-    );
-  }
-
   return (
     <>
-      <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200/80">
-        <div className="flex justify-between items-center mb-4 border-b pb-3">
-            <h2 className="text-2xl font-semibold text-slate-700">Expense History</h2>
+      <div className="card-premium p-6 md:p-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <div>
+                <h2 className="text-sm font-semibold text-slate-900 tracking-tight">Recent Expenses</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{filteredExpenses.length} transactions recorded</p>
+            </div>
             
-            {availableCategories.length > 2 && (
-                <div className="relative" ref={filterRef}>
-                    <button 
-                        onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        className="flex items-center gap-2 pl-3 pr-2 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors"
-                    >
-                        <FilterIcon className="h-4 w-4" />
-                        <span>{filterCategory}</span>
-                        <ChevronDownIcon className={`h-4 w-4 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    {isFilterOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-10 py-1 max-h-60 overflow-y-auto">
-                            {availableCategories.map(cat => (
-                                <button 
-                                    key={cat}
-                                    onClick={() => handleSelectFilter(cat)}
-                                    className={`w-full text-left px-4 py-2 text-sm ${filterCategory === cat ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-100'}`}
+            <div className="flex items-center gap-4">
+                {availableCategories.length > 2 && (
+                    <div className="relative" ref={filterRef}>
+                        <button 
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                            className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-all"
+                        >
+                            <FilterIcon className="h-3 w-3 opacity-60" />
+                            <span>{filterCategory}</span>
+                            <ChevronDownIcon className={`h-3 w-3 transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        <AnimatePresence>
+                            {isFilterOpen && (
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 5 }}
+                                    className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-lg border border-slate-200 z-50 py-1 overflow-hidden"
                                 >
-                                    {cat}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
+                                    <div className="max-h-60 overflow-y-auto">
+                                        {availableCategories.map(cat => (
+                                            <button 
+                                                key={cat}
+                                                onClick={() => handleSelectFilter(cat)}
+                                                className={`w-full text-left px-4 py-2 text-xs font-medium transition-colors ${filterCategory === cat ? 'bg-slate-50 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+                                            >
+                                                {cat}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                )}
+            </div>
         </div>
         
-        {filteredExpenses.length === 0 ? renderEmptyState() : (
-            <ul className="space-y-3 max-h-96 overflow-y-auto pr-2">
-            {filteredExpenses.slice().reverse().map(expense => {
-                const color = getCategoryColor(expense.category);
-                return (
-                    <li key={expense.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors duration-200">
-                        <div className="flex-grow mr-4">
-                            <p className="font-semibold text-slate-800">{expense.merchant}</p>
-                            <p className="text-sm text-slate-500">{new Date(expense.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                           <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full ${color.bg} ${color.text}`}>
-                              {expense.category}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                            <p className="font-medium text-slate-700 text-right">₹{expense.amount.toFixed(2)}</p>
-                            <button
-                                onClick={() => handleOpenConfirm(expense)}
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors"
-                                aria-label={`Delete expense from ${expense.merchant}`}
-                                title="Delete Expense"
+        <div className="relative">
+            {filteredExpenses.length === 0 ? renderEmptyState() : (
+                <ul className="space-y-3">
+                <AnimatePresence mode="popLayout">
+                    {filteredExpenses.map((expense, index) => {
+                        const color = getCategoryColor(expense.category);
+                        const isEditing = editingCategoryId === expense.id;
+
+                        return (
+                            <motion.li 
+                                layout
+                                key={expense.id} 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="group flex items-center justify-between p-3.5 bg-white rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/30 transition-all duration-200"
                             >
-                                <TrashIcon className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </li>
-                )
-            })}
-            </ul>
-        )}
+                                <div className="flex items-center gap-3.5 flex-grow min-w-0">
+                                    <div className={`h-10 w-10 flex-shrink-0 rounded-lg flex items-center justify-center font-bold text-sm ${color.bg} ${color.text}`}>
+                                        {expense.merchant.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex-grow min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-medium text-slate-900 truncate tracking-tight">{expense.merchant}</p>
+                                            <div className="relative" ref={isEditing ? editCategoryRef : null}>
+                                                <button 
+                                                    onClick={() => setEditingCategoryId(isEditing ? null : expense.id)}
+                                                    className={`px-1.5 py-0.5 text-[9px] font-semibold rounded border ${color.bg} ${color.text} ${color.border} hover:opacity-80 transition-all inline-flex items-center gap-1`}
+                                                >
+                                                    {expense.category}
+                                                    <ChevronDownIcon className="h-2 w-2" />
+                                                </button>
+
+                                                <AnimatePresence>
+                                                    {isEditing && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, y: 5 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: 5 }}
+                                                            className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-[60] p-2"
+                                                        >
+                                                            <div className="grid grid-cols-2 gap-1.5">
+                                                                {categories.map(cat => (
+                                                                    <button
+                                                                        key={cat}
+                                                                        onClick={() => handleUpdateCategory(expense.id, cat)}
+                                                                        className={`text-left px-2 py-1.5 text-[10px] font-medium rounded-lg transition-all ${expense.category === cat ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                                                                    >
+                                                                        {cat}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 mt-0.5">{new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-4 flex-shrink-0">
+                                    <p className="font-semibold text-slate-900 tracking-tight">
+                                        ₹{expense.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    </p>
+                                    <button
+                                        onClick={() => handleOpenConfirm(expense)}
+                                        className="p-1.5 text-slate-300 hover:text-slate-600 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    >
+                                        <TrashIcon className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            </motion.li>
+                        )
+                    })}
+                </AnimatePresence>
+                </ul>
+            )}
+        </div>
       </div>
 
       <ConfirmationModal
         isOpen={isConfirmOpen}
         onClose={handleCloseConfirm}
         onConfirm={handleConfirmDelete}
-        title="Confirm Deletion"
+        title="Delete Transaction"
         message={
           expenseToDelete && (
-            <>
-              Are you sure you want to delete the transaction from{" "}
-              <strong>{expenseToDelete.merchant}</strong> for{" "}
-              <strong>₹{expenseToDelete.amount.toFixed(2)}</strong>?
-              <br />
-              This action cannot be undone.
-            </>
+            <div className="text-center sm:text-left">
+              <p className="text-slate-600">Permanently remove record from <span className="text-slate-900 font-bold">{expenseToDelete.merchant}</span>?</p>
+              <p className="text-xs text-rose-500 mt-2 font-bold uppercase tracking-widest italic">This operation is irreversible.</p>
+            </div>
           )
         }
-        confirmText="Delete"
+        confirmText="Confirm Delete"
         confirmVariant="danger"
       />
     </>

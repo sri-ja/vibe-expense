@@ -1,7 +1,19 @@
 
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+    ClipboardList, 
+    Plus, 
+    Trash2, 
+    CheckCircle2, 
+    Circle, 
+    Rocket, 
+    Flag, 
+    Calendar,
+    Sparkles,
+    Trash
+} from 'lucide-react';
 import { RoadmapItem } from '../types';
-import { TrashIcon } from './icons/TrashIcon';
 
 interface RoadmapManagerProps {
   roadmap: RoadmapItem[];
@@ -44,68 +56,107 @@ const RoadmapManager: React.FC<RoadmapManagerProps> = ({ roadmap, setRoadmap }) 
   });
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <h3 className="text-lg font-semibold text-slate-700 mb-4">Roadmap & Future Ideas</h3>
-      <p className="text-sm text-slate-500 mb-6">
-        Keep track of features you want to add or improvements you're planning.
-      </p>
-
-      <form onSubmit={handleAddNote} className="mb-8">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
-            placeholder="e.g., Add dark mode support..."
-            className="flex-grow p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-          />
-          <button
-            type="submit"
-            className="px-6 py-2 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
-          >
-            Add Idea
-          </button>
-        </div>
-      </form>
-
-      <div className="space-y-3">
-        {sortedRoadmap.length === 0 ? (
-          <div className="text-center py-10 bg-white border border-dashed rounded-xl">
-            <p className="text-slate-400">No notes yet. Add your first idea above!</p>
-          </div>
-        ) : (
-          sortedRoadmap.map(item => (
-            <div 
-              key={item.id} 
-              className={`flex items-center justify-between p-4 bg-white border rounded-xl shadow-sm transition-all duration-200 ${item.isCompleted ? 'opacity-60 grayscale' : 'hover:border-indigo-200'}`}
-            >
-              <div className="flex items-center gap-4 flex-grow">
-                <input
-                  type="checkbox"
-                  checked={item.isCompleted}
-                  onChange={() => handleToggleComplete(item.id)}
-                  className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                />
-                <span className={`text-slate-700 font-medium ${item.isCompleted ? 'line-through' : ''}`}>
-                  {item.text}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] text-slate-400 hidden sm:block">
-                  {new Date(item.createdAt).toLocaleDateString()}
-                </span>
-                <button
-                  onClick={() => handleDeleteItem(item.id)}
-                  className="p-1 text-slate-300 hover:text-red-500 transition-colors"
-                  aria-label="Delete item"
-                >
-                  <TrashIcon className="h-5 w-5" />
-                </button>
-              </div>
+    <div className="space-y-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4 text-slate-400" />
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Strategic Roadmap</h3>
+                </div>
+                <p className="text-sm text-slate-500"> 
+                    Plan upcoming features and improvements.
+                </p>
             </div>
-          ))
-        )}
-      </div>
+            
+            <form onSubmit={handleAddNote} className="flex-grow max-w-md">
+                <div className="relative group">
+                    <input
+                        type="text"
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        placeholder="Add a roadmap item..."
+                        className="w-full pl-5 pr-14 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:border-slate-400 outline-none shadow-sm"
+                    />
+                    <button
+                        type="submit"
+                        disabled={!newNote.trim()}
+                        className="absolute right-1.5 top-1.5 p-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-20 transition-all"
+                    >
+                        <Plus className="h-4 w-4" />
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+            <AnimatePresence mode="popLayout">
+                {sortedRoadmap.length === 0 ? (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="py-12 border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-300 text-center"
+                    >
+                        <Sparkles className="h-8 w-8 mb-4 opacity-50" />
+                        <p className="text-xs font-medium uppercase tracking-wider">Roadmap is empty</p>
+                    </motion.div>
+                ) : (
+                    sortedRoadmap.map((item, index) => (
+                        <motion.div 
+                            layout
+                            key={item.id} 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className={`flex items-center justify-between p-4 bg-white border rounded-xl shadow-sm transition-all relative group ${
+                                item.isCompleted 
+                                ? 'border-slate-100 opacity-60' 
+                                : 'border-slate-200 hover:border-slate-400'
+                            }`}
+                        >
+                            <div className="flex items-center gap-4 flex-grow">
+                                <button 
+                                    onClick={() => handleToggleComplete(item.id)}
+                                    className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all ${
+                                        item.isCompleted 
+                                        ? 'bg-emerald-100 text-emerald-600' 
+                                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    {item.isCompleted ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                                </button>
+                                
+                                <div>
+                                    <span className={`text-sm font-medium ${
+                                        item.isCompleted ? 'text-slate-400 line-through' : 'text-slate-900'
+                                    }`}>
+                                        {item.text}
+                                    </span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <div className="text-[10px] font-medium text-slate-400">
+                                            {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        </div>
+                                        {item.isCompleted && (
+                                            <>
+                                                <div className="h-1 w-1 bg-slate-200 rounded-full" />
+                                                <span className="text-[10px] font-medium text-emerald-600">Completed</span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="p-2 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-50 transition-all opacity-0 group-hover:opacity-100"
+                                aria-label="Delete item"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        </motion.div>
+                    ))
+                )}
+            </AnimatePresence>
+        </div>
     </div>
   );
 };

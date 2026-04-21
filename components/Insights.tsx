@@ -1,9 +1,19 @@
 
 import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
+import { 
+    Lightbulb, 
+    X, 
+    Calendar, 
+    ChevronRight, 
+    Sparkles, 
+    AlertCircle,
+    Info
+} from 'lucide-react';
 import { Expense } from '../types';
 import { getSpendingInsights } from '../services/geminiService';
 import { SpinnerIcon } from './icons/SpinnerIcon';
-import { LightbulbIcon } from './icons/LightbulbIcon';
 import { getStartOfWeek, toLocalDateString } from '../utils/dateUtils';
 
 interface InsightsProps {
@@ -24,10 +34,8 @@ const Insights: React.FC<InsightsProps> = ({ onClose, allExpenses }) => {
 
     const filteredExpenses = useMemo(() => {
         if (!startDate || !endDate) return [];
-        
         const start = new Date(startDate);
         const end = new Date(endDate);
-
         return allExpenses.filter(exp => {
             const expDate = new Date(exp.date);
             return expDate >= start && expDate <= end;
@@ -90,151 +98,142 @@ const Insights: React.FC<InsightsProps> = ({ onClose, allExpenses }) => {
             setIsLoading(false);
         }
     };
-    
-    // Helper to parse inline markdown like **bold** text.
-    const parseInlineMarkdown = (text: string): React.ReactNode[] => {
-        const parts = text.split(/(\*\*.*?\*\*)/g); // Split by bold tags, keeping them
-        return parts.filter(part => part).map((part, index) => { // Filter out empty strings
-            if (part.startsWith('**') && part.endsWith('**')) {
-                return <strong key={index}>{part.slice(2, -2)}</strong>;
-            }
-            return part;
-        });
-    };
-    
-    // Simple markdown-to-HTML renderer
-    const renderFormattedText = (text: string) => {
-        const lines = text.split('\n');
-        // Fix: Use React.ReactNode instead of JSX.Element to resolve namespace error
-        const elements: React.ReactNode[] = [];
-        let listItems: React.ReactNode[] = [];
-
-        const closeList = () => {
-            if (listItems.length > 0) {
-                elements.push(<ul key={`ul-${elements.length}`} className="list-disc pl-5 space-y-1 my-2">{listItems}</ul>);
-                listItems = [];
-            }
-        };
-
-        lines.forEach((line, index) => {
-            const trimmedLine = line.trim();
-
-            if (trimmedLine.startsWith('* ')) {
-                listItems.push(
-                    <li key={`li-${index}`} className="text-slate-600">
-                        {parseInlineMarkdown(trimmedLine.substring(2))}
-                    </li>
-                );
-            } else {
-                closeList(); // End of a list block
-                if (trimmedLine.startsWith('### ')) {
-                    elements.push(
-                        <h3 key={`h3-${index}`} className="text-lg font-semibold text-slate-800 mt-4 mb-2">
-                            {parseInlineMarkdown(trimmedLine.substring(4))}
-                        </h3>
-                    );
-                } else if (trimmedLine) { // Don't render empty paragraphs
-                    elements.push(
-                        <p key={`p-${index}`} className="text-slate-600 mb-2">
-                            {parseInlineMarkdown(line)}
-                        </p>
-                    );
-                }
-            }
-        });
-        
-        closeList(); // Close any remaining list at the end of the text
-
-        return elements;
-    };
 
     return (
-        <div 
-            className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 md:p-8"
             onClick={onClose}
         >
-            <div 
-                className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-2xl h-auto max-h-[90vh] flex flex-col"
+            <motion.div 
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden relative"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-white rounded-t-2xl">
+                <div className="flex justify-between items-center p-6 border-b border-slate-200 bg-white sticky top-0 z-10">
                     <div className="flex items-center gap-3">
-                        <LightbulbIcon className="h-6 w-6 text-indigo-500" />
-                        <h2 className="text-xl font-bold text-slate-800">AI Spending Insights</h2>
+                        <div className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600">
+                            <Lightbulb className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-semibold text-slate-900 tracking-tight">Spending Insights</h2>
+                            <p className="text-xs text-slate-500 font-medium tracking-tight">AI-powered financial analysis</p>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="text-slate-500 hover:text-slate-800 text-3xl leading-none">&times;</button>
+                    <button 
+                        onClick={onClose} 
+                        className="p-2 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
                 </div>
 
-                {/* Content */}
-                <div className="flex-grow p-6 overflow-y-auto">
-                    <div className="bg-white p-4 rounded-lg border border-slate-200">
-                        <p className="text-sm font-medium text-slate-700 mb-3">Select date range for analysis:</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                            <button onClick={() => handleSetDateRange('this-week')} className="w-full text-sm py-1.5 px-2 rounded-md font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">This Week</button>
-                            <button onClick={() => handleSetDateRange('last-week')} className="w-full text-sm py-1.5 px-2 rounded-md font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">Last Week</button>
-                            <button onClick={() => handleSetDateRange('this-month')} className="w-full text-sm py-1.5 px-2 rounded-md font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">This Month</button>
-                            <button onClick={() => handleSetDateRange('last-month')} className="w-full text-sm py-1.5 px-2 rounded-md font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">Last Month</button>
+                <div className="flex-grow overflow-y-auto p-6 md:p-8 custom-scrollbar">
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-8">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Calendar className="h-4 w-4 text-slate-400" />
+                            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Analysis Range</h3>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="start-date" className="block text-xs text-slate-500">Start Date</label>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
+                            {['this-week', 'last-week', 'this-month', 'last-month'].map((preset) => (
+                                <button 
+                                    key={preset}
+                                    onClick={() => handleSetDateRange(preset as any)} 
+                                    className="px-3 py-2 rounded-lg font-medium text-[11px] uppercase tracking-wider text-slate-600 bg-slate-50 border border-slate-200 hover:border-slate-400 transition-all text-center"
+                                >
+                                    {preset.replace('-', ' ')}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider ml-1">Start Date</label>
                                 <input 
                                     type="date" 
-                                    id="start-date" 
                                     value={startDate} 
                                     onChange={(e) => setStartDate(e.target.value)}
-                                    className="mt-1 w-full p-2 bg-white border border-slate-300 rounded-md"
+                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-900 outline-none focus:border-slate-400 transition-all"
                                 />
                             </div>
-                             <div>
-                                <label htmlFor="end-date" className="block text-xs text-slate-500">End Date</label>
+                             <div className="space-y-1.5">
+                                <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider ml-1">End Date</label>
                                 <input 
                                     type="date" 
-                                    id="end-date" 
                                     value={endDate} 
                                     onChange={(e) => setEndDate(e.target.value)}
-                                    className="mt-1 w-full p-2 bg-white border border-slate-300 rounded-md"
+                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-900 outline-none focus:border-slate-400 transition-all"
                                 />
                             </div>
                         </div>
-                    </div>
 
-                    <div className="mt-6">
                         <button 
                             onClick={handleGenerateInsights}
                             disabled={isLoading}
-                            className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 disabled:cursor-not-allowed"
+                            className="w-full mt-6 btn-primary py-3 flex items-center justify-center gap-3 transition-all"
                         >
                             {isLoading ? (
                                 <>
-                                    <SpinnerIcon className="h-5 w-5 text-white" />
-                                    Generating Insights...
+                                    <SpinnerIcon className="h-4 w-4 text-white animate-spin" />
+                                    Analyzing Data...
                                 </>
                             ) : (
-                                `Analyze ${filteredExpenses.length} Expenses`
+                                <>
+                                    Generate Insights ({filteredExpenses.length} records)
+                                    <ChevronRight className="h-4 w-4" />
+                                </>
                             )}
                         </button>
                     </div>
 
-                    <div className="mt-6">
-                        {error && <div className="bg-red-100 text-red-800 p-3 rounded-md text-sm">{error}</div>}
-                        
-                        {insightsResult && !isLoading && (
-                            <div className="bg-white p-5 rounded-lg border border-slate-200">
-                                {renderFormattedText(insightsResult)}
-                            </div>
-                        )}
-                        
-                        {!insightsResult && !isLoading && !error && (
-                            <div className="text-center py-10">
-                                <p className="text-slate-500">Your spending analysis will appear here.</p>
-                            </div>
-                        )}
+                    <div className="min-h-[200px]">
+                         <AnimatePresence mode="wait">
+                            {error && (
+                                <motion.div 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-3 text-rose-600"
+                                >
+                                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                                    <p className="text-xs font-medium">{error}</p>
+                                </motion.div>
+                            )}
+                            
+                            {insightsResult && !isLoading && (
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm markdown-body"
+                                >
+                                    <div className="prose prose-slate prose-sm max-w-none">
+                                        <ReactMarkdown>{insightsResult}</ReactMarkdown>
+                                    </div>
+                                </motion.div>
+                            )}
+                            
+                            {!insightsResult && !isLoading && !error && (
+                                <motion.div 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="flex flex-col items-center justify-center py-12 text-center"
+                                >
+                                    <div className="h-16 w-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4 text-slate-300">
+                                        <Sparkles className="h-6 w-6" />
+                                    </div>
+                                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Ready for analysis</p>
+                                    <p className="text-xs text-slate-300 mt-1">Select a date range to generate spending insights.</p>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
-            </div>
-        </div>
+            </motion.div>
+        </motion.div>
     );
 };
 

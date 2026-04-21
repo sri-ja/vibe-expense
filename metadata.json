@@ -3,5 +3,6 @@
   "description": "An expense tracker that helps you categorize transaction notifications. Visualize your spending with an interactive chart and gain control over your finances.",
   "requestFramePermissions": [
     "camera"
-  ]
+  ],
+  "majorCapabilities": []
 }
