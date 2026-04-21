@@ -23,7 +23,8 @@ import {
     Filter,
     TrendingUp,
     BarChart3,
-    Check
+    Check,
+    StickyNote
 } from 'lucide-react';
 import { Expense } from '../types';
 import { aggregateMultiCategoryExpenses, formatTrendDate } from '../utils/trendsUtils';
@@ -36,6 +37,7 @@ interface TrendsProps {
   initialTab: 'trends' | 'insights';
   expenses: Expense[];
   categories: string[];
+  monthNotes?: Record<string, string>;
 }
 
 const TrendsTooltip = ({ active, payload, label, period }: any) => {
@@ -63,7 +65,7 @@ const TrendsTooltip = ({ active, payload, label, period }: any) => {
   return null;
 };
 
-const SpendingTrends: React.FC<{ expenses: Expense[]; categories: string[]; }> = ({ expenses, categories }) => {
+const SpendingTrends: React.FC<{ expenses: Expense[]; categories: string[]; monthNotes?: Record<string, string>; }> = ({ expenses, categories, monthNotes }) => {
     const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
     const [selectedCategories, setSelectedCategories] = useState<string[]>(['overall']);
     const [isCategorySelectorOpen, setIsCategorySelectorOpen] = useState(false);
@@ -217,6 +219,22 @@ const SpendingTrends: React.FC<{ expenses: Expense[]; categories: string[]; }> =
                 </div>
             </div>
 
+            {period === 'week' && monthNotes && (
+                <div className="mb-6 px-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                        <StickyNote className="h-3 w-3 text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Context for this Month</span>
+                    </div>
+                    {monthNotes[`${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`] ? (
+                        <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                            {monthNotes[`${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`]}
+                        </p>
+                    ) : (
+                        <p className="text-xs text-slate-300 italic">No notes recorded for this month.</p>
+                    )}
+                </div>
+            )}
+
             <div className="flex-grow min-h-[400px]">
                {trendData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -281,7 +299,7 @@ const SpendingTrends: React.FC<{ expenses: Expense[]; categories: string[]; }> =
     );
 };
 
-const Trends: React.FC<TrendsProps> = ({ onClose, initialTab, expenses, categories }) => {
+const Trends: React.FC<TrendsProps> = ({ onClose, initialTab, expenses, categories, monthNotes }) => {
     const [activeTab, setActiveTab] = useState(initialTab);
     
     return (
@@ -345,7 +363,7 @@ const Trends: React.FC<TrendsProps> = ({ onClose, initialTab, expenses, categori
                                 exit={{ opacity: 0 }}
                                 className="h-full"
                             >
-                                <SpendingTrends expenses={expenses} categories={categories} />
+                                <SpendingTrends expenses={expenses} categories={categories} monthNotes={monthNotes} />
                             </motion.div>
                         ) : (
                             <motion.div 

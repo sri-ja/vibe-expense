@@ -32,6 +32,7 @@ interface SettingsProps {
   setCustomParsers: React.Dispatch<React.SetStateAction<CustomParser[]>>;
   roadmap: RoadmapItem[];
   setRoadmap: React.Dispatch<React.SetStateAction<RoadmapItem[]>>;
+  monthNotes: Record<string, string>;
   onImportData: (data: AppData) => void;
   onExportJson: () => void;
 }
@@ -117,7 +118,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
                             )}
                             {activeTab === 'roadmap' && <RoadmapManager roadmap={props.roadmap} setRoadmap={props.setRoadmap} />}
                             {activeTab === 'data' && (
-                                <DataManager appData={{ categorizedExpenses: props.categorizedExpenses, budgets: props.budgets, categories: props.categories, customParsers: props.customParsers, roadmap: props.roadmap }} onImport={props.onImportData} onExportJson={props.onExportJson} />
+                                <DataManager appData={{ categorizedExpenses: props.categorizedExpenses, budgets: props.budgets, categories: props.categories, customParsers: props.customParsers, roadmap: props.roadmap, monthNotes: props.monthNotes }} onImport={props.onImportData} onExportJson={props.onExportJson} />
                             )}
                         </motion.div>
                     </AnimatePresence>

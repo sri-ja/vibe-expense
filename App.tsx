@@ -34,6 +34,7 @@ import { logService } from './services/logService';
 import Settings from './components/Settings';
 import Trends from './components/Trends';
 import ReceiptScanner from './components/ReceiptScanner';
+import MonthNoteEditor from './components/MonthNoteEditor';
 
 const LOCAL_STORAGE_KEY = 'expense-tracker-data-v2';
 
@@ -46,6 +47,8 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<string[]>([...DEFAULT_EXPENSE_CATEGORIES]);
   const [customParsers, setCustomParsers] = useState<CustomParser[]>([]);
   const [roadmap, setRoadmap] = useState<RoadmapItem[]>([]);
+  const [monthNotes, setMonthNotes] = useState<Record<string, string>>({});
+  const [monthSpecificCategories, setMonthSpecificCategories] = useState<Record<string, string[]>>({});
   const [pendingTextTransactions, setPendingTextTransactions] = useState<string[]>([]);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -78,6 +81,8 @@ const App: React.FC = () => {
                 setCategories(loadedData.categories && loadedData.categories.length > 0 ? loadedData.categories : [...DEFAULT_EXPENSE_CATEGORIES]);
                 setCustomParsers(loadedData.customParsers || []);
                 setRoadmap(loadedData.roadmap || []);
+                setMonthNotes(loadedData.monthNotes || {});
+                setMonthSpecificCategories(loadedData.monthSpecificCategories || {});
                 logService.addLog("Data loaded successfully.", "info");
             }
         } catch (e) {
@@ -100,6 +105,8 @@ const App: React.FC = () => {
             categories,
             customParsers,
             roadmap,
+            monthNotes,
+            monthSpecificCategories,
         };
 
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
@@ -233,6 +240,18 @@ const App: React.FC = () => {
 
   const handleDeleteExpense = (idToDelete: string) => setCategorizedExpenses(prev => prev.filter(expense => expense.id !== idToDelete));
   
+  const handleUpdateMonthNote = (note: string) => {
+      const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+      setMonthNotes(prev => ({ ...prev, [monthKey]: note }));
+      logService.addLog(`Updated context for ${monthKey}.`, "info");
+  };
+
+  const handleUpdateMonthCategories = (newCategories: string[]) => {
+      const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+      setMonthSpecificCategories(prev => ({ ...prev, [monthKey]: newCategories }));
+      logService.addLog(`Updated special categories for ${monthKey}.`, "info");
+  };
+
   const navigateDate = (direction: 'prev' | 'next') => {
     const increment = direction === 'next' ? 1 : -1;
     if (viewMode === 'week') {
@@ -256,11 +275,13 @@ const App: React.FC = () => {
     setCategories(data.categories && data.categories.length > 0 ? data.categories : [...DEFAULT_EXPENSE_CATEGORIES]);
     setCustomParsers(data.customParsers || []);
     setRoadmap(data.roadmap || []);
+    setMonthNotes(data.monthNotes || {});
+    setMonthSpecificCategories(data.monthSpecificCategories || {});
     setIsSettingsOpen(false);
   };
 
   const handleExportJson = () => {
-        const jsonString = JSON.stringify({ categorizedExpenses, budgets, categories, customParsers, roadmap }, null, 2);
+        const jsonString = JSON.stringify({ categorizedExpenses, budgets, categories, customParsers, roadmap, monthNotes, monthSpecificCategories }, null, 2);
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -270,9 +291,15 @@ const App: React.FC = () => {
         URL.revokeObjectURL(url);
   };
 
-    if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center"><SpinnerIcon className="h-10 w-10 text-slate-400 mx-auto mb-4 animate-spin" /><p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Syncing Data</p></motion.div></div>;
+  const currentMonthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+  const availableCategories = useMemo(() => {
+    const monthSpecific = monthSpecificCategories[currentMonthKey] || [];
+    return [...categories, ...monthSpecific];
+  }, [categories, monthSpecificCategories, currentMonthKey]);
 
-    return (
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center"><SpinnerIcon className="h-10 w-10 text-slate-400 mx-auto mb-4 animate-spin" /><p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Syncing Data</p></motion.div></div>;
+
+  return (
         <div className="min-h-screen bg-[#fcfcfd] flex flex-col selection:bg-slate-900 selection:text-white">
             <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
                 <div className="container mx-auto px-4 md:px-8">
@@ -334,6 +361,16 @@ const App: React.FC = () => {
                             </div>
                         </motion.div>
                         
+                        {viewMode === 'month' && (
+                            <MonthNoteEditor 
+                                monthKey={currentMonthKey}
+                                note={monthNotes[currentMonthKey] || ''}
+                                monthCategories={monthSpecificCategories[currentMonthKey] || []}
+                                onSaveNote={handleUpdateMonthNote}
+                                onSaveCategories={handleUpdateMonthCategories}
+                            />
+                        )}
+
                         <AnimatePresence mode="popLayout">
                             {currentAiConfirmation && (
                                 <motion.div key={currentAiConfirmation.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm max-w-5xl mx-auto overflow-hidden">
@@ -351,7 +388,7 @@ const App: React.FC = () => {
                                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs">{pendingTransactions.length}</span>
                                         <h2 className="text-xl font-bold text-slate-900 tracking-tight">Categorize Expense</h2>
                                     </div>
-                                    <TransactionCard transaction={currentTransaction} onIgnore={() => handleIgnore(currentTransaction.id)} onCategorize={(category) => handleCategorize(currentTransaction, category)} categories={categories} />
+                                    <TransactionCard transaction={currentTransaction} onIgnore={() => handleIgnore(currentTransaction.id)} onCategorize={(category) => handleCategorize(currentTransaction, category)} categories={availableCategories} />
                                 </motion.div>
                             )}
 
@@ -387,7 +424,7 @@ const App: React.FC = () => {
                               expenses={visibleExpenses} 
                               onDeleteExpense={handleDeleteExpense} 
                               onUpdateCategory={handleUpdateExpenseCategory}
-                              categories={categories}
+                              categories={availableCategories}
                             />
                         </motion.div>
                     </div>
@@ -395,9 +432,9 @@ const App: React.FC = () => {
             </main>
 
             <AnimatePresence>
-                {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} categories={categories} setCategories={setCategories} categorizedExpenses={categorizedExpenses} budgets={budgets} setBudgets={setBudgets} customParsers={customParsers} setCustomParsers={setCustomParsers} roadmap={roadmap} setRoadmap={setRoadmap} onImportData={handleImportData} onExportJson={handleExportJson} />}
+                {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} categories={categories} setCategories={setCategories} categorizedExpenses={categorizedExpenses} budgets={budgets} setBudgets={setBudgets} customParsers={customParsers} setCustomParsers={setCustomParsers} roadmap={roadmap} setRoadmap={setRoadmap} monthNotes={monthNotes} onImportData={handleImportData} onExportJson={handleExportJson} />}
                 {isViewingLogs && <LogViewer onClose={() => setIsViewingLogs(false)} />}
-                {isAnalysisOpen && <Trends onClose={() => setIsAnalysisOpen(false)} initialTab="trends" expenses={categorizedExpenses} categories={categories} />}
+                {isAnalysisOpen && <Trends onClose={() => setIsAnalysisOpen(false)} initialTab="trends" expenses={categorizedExpenses} categories={availableCategories} monthNotes={monthNotes} />}
                 {isScanningReceipt && <ReceiptScanner onClose={() => setIsScanningReceipt(false)} onReceiptParsed={handleReceiptParsed} initialMode={scanMode} />}
             </AnimatePresence>
             

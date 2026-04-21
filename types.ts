@@ -50,6 +50,8 @@ export interface AppData {
   categories: string[];
   customParsers: CustomParser[];
   roadmap?: RoadmapItem[];
+  monthNotes?: Record<string, string>;
+  monthSpecificCategories?: Record<string, string[]>;
 }
 
 export interface AiConfirmationItem {
